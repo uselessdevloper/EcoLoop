@@ -467,7 +467,7 @@ export default function MobileScannerPage() {
                     {loading ? (
                       <>
                         <Activity size={18} className="animate-spin text-purple-200" />
-                        Running EasyOCR &amp; Gemini Vision...
+                        Running Intelligent Diagnostic Scan...
                       </>
                     ) : (
                       <>

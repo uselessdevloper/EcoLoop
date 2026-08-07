@@ -35,7 +35,7 @@ export default function LandingPage() {
       title: "EasyOCR & Vision AI",
       subtitle: "Sub-second brand identification for OnePlus, iPhones, Laptops, RAM, & SSDs with CPU-Z hardware verification.",
       icon: "⚡",
-      badge: "Gemini 2.5 Flash AI"
+      badge: "Advanced Vision AI"
     }
   ];
 
