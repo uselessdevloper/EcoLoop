@@ -103,27 +103,38 @@ def extract_ocr_text_from_image(image_bytes: bytes) -> str:
     return " | ".join(extracted_tokens)
 
 def call_gemini_vision_ai(
-    image_bytes: bytes,
+    images: List[bytes],
     preset_category: str = "auto",
     diagnostics: Dict[str, Any] = {}
 ) -> Optional[Dict[str, Any]]:
     """
     Calls Gemini 2.5 Flash Vision model on Vertex AI using gcloud CLI authentication token.
-    Provides real multimodal computer vision analysis of the uploaded electronic asset photo.
+    Provides real multimodal computer vision analysis of the uploaded electronic asset photos.
     """
     token = get_gcloud_token()
     if not token:
         return None
 
     try:
-        compressed_bytes, mime_type = compress_image_for_ai(image_bytes)
-        b64_img = base64.b64encode(compressed_bytes).decode("utf-8")
-        ocr_text = extract_ocr_text_from_image(image_bytes)
-        logger.info(f"Extracted OCR text tokens: '{ocr_text}'")
+        parts = []
+        all_ocr_texts = []
+        
+        # Process each image, compress, base64 encode and extract OCR
+        for idx, img_bytes in enumerate(images):
+            compressed_bytes, mime_type = compress_image_for_ai(img_bytes)
+            b64_img = base64.b64encode(compressed_bytes).decode("utf-8")
+            parts.append({"inlineData": {"mimeType": mime_type, "data": b64_img}})
+            
+            ocr_text = extract_ocr_text_from_image(img_bytes)
+            if ocr_text:
+                all_ocr_texts.append(f"Image {idx+1}: {ocr_text}")
+
+        combined_ocr = " | ".join(all_ocr_texts)
+        logger.info(f"Combined OCR text tokens: '{combined_ocr}'")
 
         prompt = (
-            f"You are a world-class hardware quality inspection AI for EcoLoop. Inspect this electronic asset photo with extreme precision.\n\n"
-            f"EXTRACTED VISIBLE OCR TEXT FROM PHOTO: \"{ocr_text}\"\n\n"
+            f"You are a world-class hardware quality inspection AI for EcoLoop. Inspect these electronic asset photos (multiple views are provided) with extreme precision.\n\n"
+            f"EXTRACTED VISIBLE OCR TEXT FROM ALL PHOTOS: \"{combined_ocr}\"\n\n"
             f"STEP 1: BRAND & MODEL IDENTIFICATION\n"
             f"- IF OCR TEXT CONTAINS '1+' OR 'OnePlus' OR 'android', THE DEVICE IS DEFINITELY A ONEPLUS SMARTPHONE (e.g. OnePlus 11 5G, OnePlus Nord, OnePlus 9 Pro, OnePlus 10R).\n"
             f"- IF OCR TEXT CONTAINS 'iPhone' OR APPLE LOGO IS VISIBLE, THE DEVICE IS AN APPLE IPHONE.\n"
@@ -165,6 +176,7 @@ def call_gemini_vision_ai(
             f"}}\n"
             f"IMPORTANT: Output ONLY raw valid JSON."
         )
+        parts.append({"text": prompt})
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -173,10 +185,7 @@ def call_gemini_vision_ai(
         payload = {
             "contents": [{
                 "role": "user",
-                "parts": [
-                    {"inlineData": {"mimeType": mime_type, "data": b64_img}},
-                    {"text": prompt}
-                ]
+                "parts": parts
             }]
         }
 
@@ -186,9 +195,9 @@ def call_gemini_vision_ai(
             result_json = json.loads(resp.read().decode("utf-8"))
             candidates = result_json.get("candidates", [])
             if candidates and "content" in candidates[0]:
-                parts = candidates[0]["content"].get("parts", [])
-                if parts and "text" in parts[0]:
-                    raw_text = parts[0]["text"].strip()
+                parts_resp = candidates[0]["content"].get("parts", [])
+                if parts_resp and "text" in parts_resp[0]:
+                    raw_text = parts_resp[0]["text"].strip()
                     json_match = re.search(r"\{[\s\S]*\}", raw_text)
                     if json_match:
                         parsed_report = json.loads(json_match.group(0))
@@ -251,19 +260,28 @@ def run_roboflow_workflow_http(
 
 def analyze_device_vision_heuristics(img_np: np.ndarray, declared_preset: str = "auto") -> Dict[str, Any]:
     """
-    Runs computer vision heuristics (aspect ratio, edge density, color histograms, contour analysis)
-    to classify device type and detect visual defects (cracks, scratches, burnt traces).
+    Runs computer vision heuristics (aspect ratio, edge density, color histograms, contour analysis, PCB green detection)
+    to accurately classify device type and detect visual defects (cracks, scratches, burnt traces).
     """
     h, w = img_np.shape[:2]
 
+    is_green_pcb = False
     if cv2 is not None and len(img_np.shape) == 3:
         gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 50, 150)
         edge_density = float(np.sum(edges > 0) / (h * w))
         laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
         hsv = cv2.cvtColor(img_np, cv2.COLOR_BGR2HSV)
+        
+        # Dark/burnt mask
         dark_burnt_mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([180, 255, 45]))
         burnt_pixel_ratio = float(np.sum(dark_burnt_mask > 0) / (h * w))
+        
+        # Green PCB mask (circuit board green)
+        green_mask = cv2.inRange(hsv, np.array([30, 40, 40]), np.array([90, 255, 255]))
+        green_ratio = float(np.sum(green_mask > 0) / (h * w))
+        if green_ratio > 0.04:
+            is_green_pcb = True
     else:
         # PIL / numpy fallback
         if len(img_np.shape) == 3:
@@ -281,16 +299,24 @@ def analyze_device_vision_heuristics(img_np: np.ndarray, declared_preset: str = 
     if declared_preset and declared_preset != "auto":
         detected_category = declared_preset.lower()
     else:
-        if aspect_ratio < 0.85 or aspect_ratio > 1.4:
-            if aspect_ratio > 2.5 or aspect_ratio < 0.4:
+        # 1. PCB Components (RAM, Motherboard, SSD, GPU)
+        if is_green_pcb or edge_density > 0.14:
+            if aspect_ratio > 1.6 or aspect_ratio < 0.6:
                 detected_category = "ram"
-            else:
-                detected_category = "phone"
-        else:
-            if edge_density > 0.15:
+            elif edge_density > 0.22:
                 detected_category = "motherboard"
+            elif aspect_ratio > 1.3:
+                detected_category = "gpu"
             else:
                 detected_category = "ssd"
+        # 2. Non-PCB Assets (Earbuds, Phone, Laptop)
+        else:
+            if 0.75 <= aspect_ratio <= 1.35 and edge_density < 0.12:
+                detected_category = "buds"
+            elif 1.35 < aspect_ratio <= 1.8:
+                detected_category = "laptop"
+            else:
+                detected_category = "phone"
 
     # Damage calculation
     crack_probability = min(0.95, round(edge_density * 4.2 + (0.15 if laplacian_var > 300 else 0.05), 2))
@@ -407,6 +433,28 @@ def generate_device_intelligence_report(
             {"name": "Dual-Fan Heatsink Cooler", "status": "Spinning & Intact" if cooler_ok else "Fins Bent / Fan Seized", "value_inr": cooler_val, "health_pct": 90 if cooler_ok else 40}
         ]
 
+    elif category in ["buds", "earbuds", "audio"]:
+        model_name = "Wings Phantom True Wireless Earbuds"
+        base_market_val = 2500
+        left_ok = crack_prob < 0.35 and hardware_diagnostics.get("display_touch", True)
+        right_ok = crack_prob < 0.35 and hardware_diagnostics.get("camera_working", True)
+        battery_ok = hardware_diagnostics.get("battery_health", 86) >= 75
+        chip_ok = not burnt_trace
+        
+        left_val = 600 if left_ok else 150
+        right_val = 600 if right_ok else 150
+        battery_val = 500 if battery_ok else 150
+        chip_val = 500 if chip_ok else 100
+        case_val = 300 if scratch_sev == "Minor" else 100
+
+        components = [
+            {"name": "Left Earbud Driver", "status": "Functional" if left_ok else "No Audio", "value_inr": left_val, "health_pct": 98 if left_ok else 20},
+            {"name": "Right Earbud Driver", "status": "Functional" if right_ok else "No Audio", "value_inr": right_val, "health_pct": 98 if right_ok else 20},
+            {"name": "Charging Case Battery", "status": "Healthy" if battery_ok else "Degraded", "value_inr": battery_val, "health_pct": 90 if battery_ok else 40},
+            {"name": "Bluetooth 5.3 Audio Controller", "status": "Functional" if chip_ok else "Connection Error", "value_inr": chip_val, "health_pct": 96 if chip_ok else 20},
+            {"name": "Case Shell & Hinge", "status": f"{scratch_sev} Wear", "value_inr": case_val, "health_pct": 95 if scratch_sev == "Minor" else 55}
+        ]
+
     else: # Motherboard / General
         model_name = "Dell Latitude Dual-Channel OEM Motherboard"
         base_market_val = 14500
@@ -486,7 +534,8 @@ def generate_device_intelligence_report(
 
 @router.post("/scan")
 async def evaluate_device(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    files: Optional[List[UploadFile]] = File(None),
     preset_category: str = Form("auto"),
     api_key: Optional[str] = Form(None),
     workspace_name: Optional[str] = Form(None),
@@ -494,43 +543,120 @@ async def evaluate_device(
     hardware_diagnostics_json: Optional[str] = Form(None)
 ):
     """
-    Scans uploaded device photo, extracts vision heuristics & optional Roboflow workflow predictions,
+    Scans uploaded device photo(s), extracts vision heuristics & optional Roboflow workflow predictions,
     combines with hardware diagnostics SDK inputs, and produces a Digital Device Intelligence Report.
     """
-    contents = await file.read()
-    img = None
-    if cv2 is not None:
-        nparr = np.frombuffer(contents, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        try:
-            pil_img = Image.open(io.BytesIO(contents)).convert("RGB")
-            img = np.array(pil_img)
-        except Exception:
-            img = None
+    # 1. Collect all uploaded images
+    uploaded_files = []
+    if file:
+        uploaded_files.append(file)
+    if files:
+        uploaded_files.extend(files)
 
-    if img is None:
+    if not uploaded_files:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to decode uploaded image. Please upload a clear photo of the electronic device."
+            detail="At least one device photo is required for scan analysis."
         )
 
-    # 1. Vision Heuristics
-    vision_results = analyze_device_vision_heuristics(img, declared_preset=preset_category)
+    images_bytes = []
+    decoded_images = []
+    for u_file in uploaded_files:
+        contents = await u_file.read()
+        images_bytes.append(contents)
+        
+        img = None
+        if cv2 is not None:
+            nparr = np.frombuffer(contents, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            try:
+                pil_img = Image.open(io.BytesIO(contents)).convert("RGB")
+                img = np.array(pil_img)
+            except Exception:
+                img = None
+        if img is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unable to decode uploaded image '{u_file.filename}'. Please upload clear photos of the electronic device."
+            )
+        decoded_images.append(img)
+
+    # 2. Vision Heuristics (run for all images and aggregate)
+    heuristics_list = []
+    for img in decoded_images:
+        heuristics_list.append(analyze_device_vision_heuristics(img, declared_preset=preset_category))
+
+    if len(heuristics_list) == 1:
+        vision_results = heuristics_list[0]
+    else:
+        # Aggregate multiple heuristics
+        category = heuristics_list[0]["category"]
+        edge_density = float(np.mean([h["edge_density"] for h in heuristics_list]))
+        blur_score = float(np.mean([h["blur_score"] for h in heuristics_list]))
+        crack_probability = float(np.max([h["crack_probability"] for h in heuristics_list]))
+        
+        severity_order = {"None": 0, "Minor": 1, "Moderate": 2, "Severe": 3}
+        max_severity = "None"
+        for h in heuristics_list:
+            if severity_order.get(h["scratch_severity"], 0) > severity_order.get(max_severity, 0):
+                max_severity = h["scratch_severity"]
+                
+        burnt_trace_detected = any(h["burnt_trace_detected"] for h in heuristics_list)
+        aspect_ratio = float(np.mean([h["aspect_ratio"] for h in heuristics_list]))
+        
+        vision_results = {
+            "category": category,
+            "edge_density": round(edge_density, 4),
+            "blur_score": round(blur_score, 2),
+            "crack_probability": crack_probability,
+            "scratch_severity": max_severity,
+            "burnt_trace_detected": burnt_trace_detected,
+            "aspect_ratio": round(aspect_ratio, 2)
+        }
+
     category = vision_results["category"]
 
-    # 2. Roboflow Serverless Workflow (if provided)
+    # OCR keyword detection to correct category if preset_category is "auto"
+    if preset_category == "auto":
+        for img_bytes in images_bytes:
+            try:
+                ocr_text = extract_ocr_text_from_image(img_bytes).lower()
+                if any(w in ocr_text for w in ["wings", "buds", "earbuds", "audio", "boat", "noise"]):
+                    vision_results["category"] = "buds"
+                    category = "buds"
+                    break
+                elif any(w in ocr_text for w in ["ram", "ddr", "corsair", "dimm", "kingston", "crucial"]):
+                    vision_results["category"] = "ram"
+                    category = "ram"
+                    break
+                elif any(w in ocr_text for w in ["ssd", "nvme", "nand", "samsung", "wd_black"]):
+                    vision_results["category"] = "ssd"
+                    category = "ssd"
+                    break
+                elif any(w in ocr_text for w in ["laptop", "dell", "lenovo", "macbook", "hp pavilion", "thinkpad"]):
+                    vision_results["category"] = "laptop"
+                    category = "laptop"
+                    break
+                elif any(w in ocr_text for w in ["rtx", "geforce", "nvidia", "radeon", "gpu"]):
+                    vision_results["category"] = "gpu"
+                    category = "gpu"
+                    break
+            except Exception:
+                pass
+
+    # 3. Roboflow Serverless Workflow (if provided, run on the first image)
     roboflow_results = None
-    if api_key and workspace_name and workflow_id:
+    if api_key and workspace_name and workflow_id and len(images_bytes) > 0:
         roboflow_results = run_roboflow_workflow_http(
             api_key=api_key,
             workspace_name=workspace_name,
             workflow_id=workflow_id,
-            image_bytes=contents,
+            image_bytes=images_bytes[0],
             classes="phone, phone_damage, scratch, crack, burnt_pin"
         )
 
-    # 3. Hardware Diagnostics SDK inputs
+    # 4. Hardware Diagnostics SDK inputs
     hardware_diagnostics = {}
     if hardware_diagnostics_json:
         try:
@@ -538,9 +664,9 @@ async def evaluate_device(
         except Exception:
             pass
 
-    # 4. Attempt Real Multimodal Gemini 2.5 Flash Vision AI analysis via Vertex AI & gcloud auth
+    # 5. Attempt Real Multimodal Gemini 2.5 Flash Vision AI analysis via Vertex AI & gcloud auth
     gemini_report = call_gemini_vision_ai(
-        image_bytes=contents,
+        images=images_bytes,
         preset_category=preset_category,
         diagnostics=hardware_diagnostics
     )

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CPU-Z Lite</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_device">Device</string>
+    <string name="title_cpu">CPU</string>
+    <string name="title_memory">Memory</string>
+    <string name="title_battery">Battery</string>
+    <string name="title_storage">Storage</string>
+    <string name="title_display">Display</string>
+    <string name="title_sensors">Sensors</string>
+    <string name="title_network">Network</string>
+    <string name="title_about">About</string>
+</resources>

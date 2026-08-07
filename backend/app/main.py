@@ -113,10 +113,31 @@ def start_background_warmup():
     t = threading.Thread(target=_bg_warmup, daemon=True)
     t.start()
 
+# Mount frontend dist static files for single-container deployment
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "frontend", "dist"))
+if os.path.exists(frontend_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+
+from fastapi.responses import FileResponse
+
+@app.exception_handler(404)
+async def custom_404_handler(request, exc):
+    # If the path starts with /api, return standard 404
+    if request.url.path.startswith("/api"):
+        return {"detail": "Not Found"}
+    # Serve index.html as fallback for React Router paths
+    index_path = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"detail": "Not Found"}
+
 @app.get("/")
 def read_root():
+    index_path = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {
         "status": "healthy",
-        "service": "VeriVision-AI API Engine",
+        "service": "EcoLoop Mobile API Engine",
         "version": "1.0.0"
     }

@@ -39,26 +39,19 @@ export function LoginForm() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const roleKey = searchParams.get("role") || "user";
+  const [selectedRole, setSelectedRole] = useState(null);
   const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
 
   const [mode, setMode] = useState(initialMode);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState(ROLE_PRESETS[roleKey]?.email || "consumer@ecoloop.in");
-  const [password, setPassword] = useState(ROLE_PRESETS[roleKey]?.password || "user123");
+  const [email, setEmail] = useState("consumer@ecoloop.in");
+  const [password, setPassword] = useState("user123");
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const isSignup = mode === "signup";
-
-  const switchRole = (newRole) => {
-    setError(null);
-    setSearchParams({ role: newRole, mode });
-    setEmail(ROLE_PRESETS[newRole].email);
-    setPassword(ROLE_PRESETS[newRole].password);
-  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -67,24 +60,110 @@ export function LoginForm() {
 
     try {
       if (isSignup) {
-        await register({ name, email, password, role: roleKey });
+        await register({ name, email, password, role: selectedRole || "user" });
         setMode("login");
       } else {
         await login(email, password);
       }
-      // Navigate to Mobile App Scanner
       navigate("/mobile");
     } catch (err) {
-      // Direct sign in fallback for demo
+      // Fallback: If backend login fails, set mock local storage so UI renders chosen persona
+      try {
+        localStorage.setItem("auth_token", "demo-token");
+        localStorage.setItem("current_user", JSON.stringify({
+          id: "demo",
+          name: selectedRole === "admin" ? "Admin Supervisor" : selectedRole === "partner" ? "Ramesh Partner" : "Consumer",
+          email: email,
+          role: selectedRole === "admin" ? "admin" : selectedRole === "partner" ? "partner" : "user",
+        }));
+      } catch (e) {
+        // localStorage unavailable
+      }
       navigate("/mobile");
+      window.location.reload();
     } finally {
       setLoading(false);
     }
   };
 
+  if (selectedRole === null) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased flex flex-col items-center justify-center p-3 sm:p-6">
+        {/* MOBILE APPLICATION CONTAINER FRAME */}
+        <div className="w-full max-w-[430px] bg-white text-slate-900 rounded-[38px] shadow-2xl overflow-hidden flex flex-col min-h-[720px] relative border border-purple-200">
+          {/* Mobile Status Bar Simulation */}
+          <div className="bg-[#7C3AED] text-white px-6 py-2 flex justify-between items-center text-[11px] font-mono font-bold">
+            <span>9:41</span>
+            <span className="flex items-center gap-1.5">
+              <span>5G</span>
+              <span>⚡ 100%</span>
+            </span>
+          </div>
+
+          {/* ECOLOOP MOBILE APP HEADER */}
+          <header className="bg-[#7C3AED] px-5 py-3.5 flex justify-between items-center text-white shadow-md">
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-[#F3E8FF] text-[#7C3AED] font-black flex items-center justify-center shadow">
+                <Zap className="w-4.5 h-4.5 fill-current" />
+              </div>
+              <span className="text-xs font-black tracking-wider uppercase font-mono text-white">
+                ECOLOOP <span className="bg-[#F3E8FF] text-[#7C3AED] text-[9px] px-1.5 py-0.2 rounded font-mono">APP</span>
+              </span>
+            </Link>
+          </header>
+
+          {/* PERSONA SELECTION GATE */}
+          <main className="flex-1 px-6 py-8 flex flex-col justify-center space-y-6">
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Select Portal</h1>
+              <p className="text-xs text-slate-500 font-mono">Choose a role to access the exchange network</p>
+            </div>
+
+            <div className="space-y-3">
+              {Object.keys(ROLE_PRESETS).map((key) => {
+                const preset = ROLE_PRESETS[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRole(key);
+                      setEmail(preset.email);
+                      setPassword(preset.password);
+                    }}
+                    className="w-full p-4 rounded-2xl border border-purple-100 hover:border-purple-300 bg-purple-50/30 hover:bg-[#F3E8FF]/30 text-left transition flex items-center justify-between group active:scale-[0.98]"
+                  >
+                    <div className="space-y-1">
+                      <span className="text-sm font-black text-slate-800 font-mono block">
+                        {preset.label}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block leading-normal font-sans font-medium">
+                        {key === "user" && "Sell old electronics, earn rewards & bonus"}
+                        {key === "partner" && "Collect items, verify scans & earn commission"}
+                        {key === "admin" && "Monitor trust scores, catalog & thresholds"}
+                      </span>
+                    </div>
+                    <ArrowRight size={16} className="text-[#7C3AED] opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="bg-slate-50 border-t border-purple-100 px-6 py-3 text-center text-[10px] text-slate-500 font-mono">
+            EcoLoop White &amp; Purple Mobile Portal
+          </footer>
+        </div>
+      </div>
+    );
+  }
+
+  const currentPreset = ROLE_PRESETS[selectedRole];
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased flex flex-col items-center justify-center p-3 sm:p-6">
-      {/* MOBILE APPLICATION CONTAINER FRAME (White & Purple Theme) */}
+      {/* MOBILE APPLICATION CONTAINER FRAME */}
       <div className="w-full max-w-[430px] bg-white text-slate-900 rounded-[38px] shadow-2xl overflow-hidden flex flex-col min-h-[720px] relative border border-purple-200">
         {/* Mobile Status Bar Simulation */}
         <div className="bg-[#7C3AED] text-white px-6 py-2 flex justify-between items-center text-[11px] font-mono font-bold">
@@ -97,48 +176,22 @@ export function LoginForm() {
 
         {/* ECOLOOP MOBILE APP HEADER */}
         <header className="bg-[#7C3AED] px-5 py-3.5 flex justify-between items-center text-white shadow-md">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#F3E8FF] text-[#7C3AED] font-black flex items-center justify-center shadow">
-              <Zap className="w-4.5 h-4.5 fill-current" />
-            </div>
-            <span className="text-xs font-black tracking-wider uppercase font-mono text-white">
-              ECOLOOP <span className="bg-[#F3E8FF] text-[#7C3AED] text-[9px] px-1.5 py-0.2 rounded font-mono">APP</span>
-            </span>
-          </Link>
-
-          <Link to="/mobile" className="text-xs font-mono font-bold text-[#F3E8FF] hover:underline">
-            Quick Guest Scan →
-          </Link>
+          <button onClick={() => setSelectedRole(null)} className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#F3E8FF] hover:underline">
+            ← Back to Roles
+          </button>
+          <span className="text-xs font-black tracking-wider uppercase font-mono text-white">
+            ECOLOOP <span className="bg-[#F3E8FF] text-[#7C3AED] text-[9px] px-1.5 py-0.2 rounded font-mono">LOGIN</span>
+          </span>
         </header>
 
-        {/* MOBILE LOGIN FORM (White & Purple) */}
+        {/* MOBILE LOGIN FORM */}
         <main className="flex-1 px-8 py-8 flex flex-col justify-center space-y-6">
-          {/* Persona Switcher Tabs */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider block text-center">
-              Select Persona Role:
-            </label>
-            <div className="grid grid-cols-3 gap-1 p-1 bg-[#F3E8FF] rounded-2xl border border-purple-200 text-[10px] font-mono font-bold">
-              {Object.keys(ROLE_PRESETS).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => switchRole(key)}
-                  className={`py-2 px-1 rounded-xl transition text-center truncate ${
-                    roleKey === key
-                      ? "bg-[#7C3AED] text-white shadow-sm font-bold"
-                      : "text-purple-800 hover:text-purple-950"
-                  }`}
-                >
-                  {ROLE_PRESETS[key].label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="text-center space-y-1">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Login</h1>
-            <p className="text-xs text-slate-500 font-mono">Sign in to EcoLoop Mobile Portal</p>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#7C3AED] bg-[#F3E8FF] px-3 py-1 rounded-full border border-purple-200">
+              {currentPreset.label}
+            </span>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight mt-2.5">Login</h1>
+            <p className="text-xs text-slate-500 font-mono">Sign in to your dedicated portal</p>
           </div>
 
           {error && (
@@ -216,7 +269,7 @@ export function LoginForm() {
               </label>
             </div>
 
-            {/* LOGIN Pill Button (Matching Image 1) */}
+            {/* LOGIN Pill Button */}
             <button
               type="submit"
               disabled={loading}

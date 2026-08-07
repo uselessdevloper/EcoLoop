@@ -1,0 +1,187 @@
+{
+  "description": "EcoLoop Automated Voice Call & SMS Fallback Studio Flow",
+  "states": [
+    {
+      "name": "Trigger",
+      "type": "trigger",
+      "transitions": [
+        {
+          "next": "make_partner_call",
+          "event": "incomingRequest"
+        },
+        {
+          "event": "incomingParent"
+        },
+        {
+          "next": "make_partner_call",
+          "event": "incomingMessage"
+        },
+        {
+          "next": "make_partner_call",
+          "event": "incomingCall"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "name": "make_partner_call",
+      "type": "make-outgoing-call-v2",
+      "transitions": [
+        {
+          "next": "gather_pickup_acceptance",
+          "event": "answered"
+        },
+        {
+          "next": "send_fallback_sms",
+          "event": "busy"
+        },
+        {
+          "next": "send_fallback_sms",
+          "event": "noAnswer"
+        },
+        {
+          "next": "send_fallback_sms",
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 100,
+          "y": 200
+        },
+        "to": "{{flow.data.To}}",
+        "from": "{{flow.data.From}}",
+        "timeout": 30
+      }
+    },
+    {
+      "name": "gather_pickup_acceptance",
+      "type": "gather-input-on-call",
+      "transitions": [
+        {
+          "next": "split_keypress",
+          "event": "keypress"
+        },
+        {
+          "next": "send_fallback_sms",
+          "event": "timeout"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 100,
+          "y": 450
+        },
+        "number_of_digits": 1,
+        "say": "Hello. You have a new EcoLoop pickup. Press 1 to accept.",
+        "voice": "alice",
+        "language": "en-US",
+        "loop": 1,
+        "stop_gather": true,
+        "gather_language": "en-US"
+      }
+    },
+    {
+      "name": "split_keypress",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_fallback_sms",
+          "event": "noMatch"
+        },
+        {
+          "next": "call_fastapi_accept",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "Pressed 1",
+              "arguments": [
+                "{{widgets.gather_pickup_acceptance.Digits}}"
+              ],
+              "type": "equal_to",
+              "value": "1"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 100,
+          "y": 700
+        },
+        "input": "{{widgets.gather_pickup_acceptance.Digits}}"
+      }
+    },
+    {
+      "name": "call_fastapi_accept",
+      "type": "make-http-request",
+      "transitions": [
+        {
+          "event": "success"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -150,
+          "y": 950
+        },
+        "method": "POST",
+        "content_type": "application/x-www-form-urlencoded;charset=utf-8",
+        "url": "{{flow.data.fastapi_webhook_url}}",
+        "headers": [
+          {
+            "key": "Bypass-Tunnel-Reminder",
+            "value": "true"
+          }
+        ],
+        "parameters": [
+          {
+            "key": "pickup_id",
+            "value": "{{flow.data.pickup_id}}"
+          },
+          {
+            "key": "Digits",
+            "value": "1"
+          },
+          {
+            "key": "status",
+            "value": "Accepted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "send_fallback_sms",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 350,
+          "y": 950
+        },
+        "to": "{{flow.data.To}}",
+        "from": "{{flow.data.From}}",
+        "body": "[EcoLoop] Pickup Request #{{flow.data.pickup_id}}\nCustomer: {{flow.data.customer_name}}\nLocation: {{flow.data.location}}\nEstimated Commission: ${{flow.data.estimated_commission}}\nReply ACCEPT to confirm."
+      }
+    }
+  ],
+  "initial_state": "Trigger",
+  "flags": {
+    "allow_concurrent_calls": true
+  }
+}

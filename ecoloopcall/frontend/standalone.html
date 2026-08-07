@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoLoop - Consumer E-Waste Pickup Portal</title>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel CDN for inline JSX execution -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Axios CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.5);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const API_BASE_URL = 'http://localhost:8000';
+
+    // Consumer Form Component
+    function ConsumerForm({ onSubmit, isSubmitting }) {
+      const [formData, setFormData] = useState({
+        consumer_name: 'Anil Sharma',
+        device: 'MacBook Pro 15" (2019)',
+        latitude: 28.6139,
+        longitude: 77.2090,
+        estimated_price: 250.00
+      });
+
+      const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+          ...prev,
+          [name]: name === 'latitude' || name === 'longitude' || name === 'estimated_price'
+            ? parseFloat(value) || value
+            : value
+        }));
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onSubmit(formData);
+      };
+
+      return (
+        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-2xl max-w-xl w-full mx-auto border border-slate-800">
+          <div className="flex items-center space-x-3 mb-6 border-b border-slate-800 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-lg">
+              📱
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-100">Submit E-Waste Pickup</h2>
+              <p className="text-xs text-slate-400">Request recycling pickup & instant partner match</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Consumer Name</label>
+              <input type="text" name="consumer_name" required value={formData.consumer_name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Device Description</label>
+              <input type="text" name="device" required value={formData.device} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Latitude</label>
+                <input type="number" step="any" name="latitude" required value={formData.latitude} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Longitude</label>
+                <input type="number" step="any" name="longitude" required value={formData.longitude} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Estimated Price ($)</label>
+              <input type="number" step="0.01" name="estimated_price" required value={formData.estimated_price} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none" />
+            </div>
+
+            <button type="submit" disabled={isSubmitting} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-slate-950 shadow-lg mt-4 flex items-center justify-center space-x-2">
+              {isSubmitting ? <span>Submitting Pickup Request...</span> : <span>Submit & Dispatch Pickup ➔</span>}
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    // Status Tracker Component with 3s Axios Polling & Pickup Confirmed Banner
+    function StatusTracker({ pickupId, onReset }) {
+      const [pickupData, setPickupData] = useState(null);
+
+      const fetchStatus = async () => {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/pickup/${pickupId}`);
+          setPickupData(res.data);
+        } catch (err) {
+          console.error("Polling error:", err);
+        }
+      };
+
+      useEffect(() => {
+        fetchStatus();
+        const interval = setInterval(fetchStatus, 3000); // Poll backend every 3s
+        return () => clearInterval(interval);
+      }, [pickupId]);
+
+      const status = pickupData?.status || 'Pending';
+      const isStep1 = status === 'Pending' || status === 'Searching';
+      const isStep2 = status === 'Assigned' || status === 'Calling' || status === 'In Transit';
+      const isStep3 = status === 'Accepted' || status === 'Completed';
+      const isRejected = status === 'Rejected' || status === 'Cancelled';
+
+      return (
+        <div className="glass-panel rounded-2xl p-6 sm:p-8 shadow-2xl max-w-2xl w-full mx-auto space-y-6 border border-slate-800">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">Live Status Tracking</span>
+              <h2 className="text-2xl font-bold text-slate-100">Pickup #{pickupId}</h2>
+            </div>
+            <span className="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full font-mono animate-pulse">
+              Polling every 3s
+            </span>
+          </div>
+
+          {/* CONFIRMED BANNER */}
+          {isStep3 && (
+            <div className="bg-emerald-950/60 border border-emerald-500 rounded-2xl p-6 text-center space-y-2">
+              <div className="w-12 h-12 bg-emerald-500 text-slate-950 rounded-full flex items-center justify-center font-bold text-xl mx-auto">✓</div>
+              <h3 className="text-2xl font-extrabold text-slate-100">Pickup Confirmed!</h3>
+              <p className="text-xs text-slate-300">Partner has accepted the pickup request and is en route.</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Step 1: Searching Partner */}
+            <div className={`p-4 rounded-xl border ${isStep1 ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500' : 'bg-slate-900 border-slate-800 opacity-60'}`}>
+              <div className="font-bold text-slate-200">1. Searching Partner</div>
+              <p className="text-xs text-slate-400 mt-1">Haversine geo-matching nearest available partner</p>
+            </div>
+
+            {/* Step 2: Calling Partner */}
+            <div className={`p-4 rounded-xl border ${isStep2 ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500 animate-pulse' : isStep3 ? 'bg-slate-900 border-slate-800' : 'bg-slate-900 border-slate-800 opacity-60'}`}>
+              <div className="font-bold text-slate-200">2. Calling Partner</div>
+              <p className="text-xs text-slate-400 mt-1">Automated Twilio voice call dispatched</p>
+            </div>
+
+            {/* Step 3: Accepted */}
+            <div className={`p-4 rounded-xl border ${isStep3 ? 'bg-emerald-500 text-slate-950 font-bold' : isRejected ? 'bg-red-950 border-red-500 text-red-300' : 'bg-slate-900 border-slate-800 opacity-60'}`}>
+              <div className="font-bold">{isRejected ? '3. Call Rejected / SMS Sent' : '3. Accepted'}</div>
+              <p className="text-xs opacity-80 mt-1">{isRejected ? 'Partner rejected call. Fallback SMS sent.' : 'Partner confirmed pickup assignment'}</p>
+            </div>
+          </div>
+
+          {pickupData && (
+            <div className="bg-slate-900/90 rounded-xl p-4 border border-slate-800 text-xs space-y-2">
+              <div className="flex justify-between font-bold">
+                <span>Consumer: {pickupData.consumer_name}</span>
+                <span className="text-emerald-400">Status: {pickupData.status}</span>
+              </div>
+              <div>Device: {pickupData.device} | Location: ({pickupData.latitude}, {pickupData.longitude})</div>
+              {pickupData.partner_details && (
+                <div className="pt-2 border-t border-slate-800 text-emerald-300 font-medium">
+                  Assigned Partner: {pickupData.partner_details.name} ({pickupData.partner_details.preferred_mode}) | Phone: {pickupData.partner_details.phone}
+                </div>
+              )}
+            </div>
+          )}
+
+          <button onClick={onReset} className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition">
+            ← Submit Another Pickup
+          </button>
+        </div>
+      );
+    }
+
+    // Main App Component
+    function App() {
+      const [pickupId, setPickupId] = useState(null);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [error, setError] = useState(null);
+
+      const handleSubmit = async (formData) => {
+        setIsSubmitting(true);
+        setError(null);
+        try {
+          const res = await axios.post(`${API_BASE_URL}/pickup/create-and-dispatch`, formData);
+          if (res.data.pickup && res.data.pickup.id) {
+            setPickupId(res.data.pickup.id);
+          }
+        } catch (err) {
+          try {
+            const fallback = await axios.post(`${API_BASE_URL}/pickup`, formData);
+            setPickupId(fallback.data.id);
+            axios.post(`${API_BASE_URL}/pickup/${fallback.data.id}/dispatch`).catch(() => {});
+          } catch (e) {
+            setError("Failed to connect to FastAPI backend at http://localhost:8000.");
+          }
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      return (
+        <div className="max-w-4xl mx-auto p-4 sm:p-8">
+          <header className="text-center mb-8">
+            <h1 className="text-3xl font-extrabold text-slate-100">🌱 EcoLoop Consumer Portal</h1>
+            <p className="text-sm text-slate-400 mt-1">Smart E-Waste Recycling & Instant Twilio Voice Dispatch</p>
+          </header>
+
+          {error && <div className="mb-4 p-3 bg-red-950 border border-red-800 text-red-300 text-center text-xs rounded-xl">{error}</div>}
+
+          {!pickupId ? (
+            <ConsumerForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+          ) : (
+            <StatusTracker pickupId={pickupId} onReset={() => setPickupId(null)} />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

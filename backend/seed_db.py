@@ -103,6 +103,24 @@ def seed():
                 "password": "user123",
                 "role": "user",
             },
+            {
+                "name": "Consumer User",
+                "email": "consumer@ecoloop.in",
+                "password": "user123",
+                "role": "user",
+            },
+            {
+                "name": "Ramesh Partner",
+                "email": "partner.ramesh@ecoloop.in",
+                "password": "partner123",
+                "role": "partner",
+            },
+            {
+                "name": "Admin Supervisor",
+                "email": "admin@ecoloop.in",
+                "password": "admin123",
+                "role": "admin",
+            },
         ]
 
         created_acc = 0

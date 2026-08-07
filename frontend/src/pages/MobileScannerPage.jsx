@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth.js";
 import {
   Camera,
   Upload,
@@ -30,7 +31,8 @@ import {
   Sliders,
   DollarSign,
   User,
-  Users
+  Users,
+  Headphones
 } from "lucide-react";
 import { evaluateDeviceScan } from "../services/evaluationService.js";
 
@@ -39,18 +41,31 @@ const PRESET_OPTIONS = [
   { id: "phone", label: "Phone", icon: Smartphone },
   { id: "laptop", label: "Laptop", icon: Laptop },
   { id: "ram", label: "RAM", icon: Cpu },
+  { id: "buds", label: "Earbuds", icon: Headphones },
   { id: "ssd", label: "SSD", icon: HardDrive },
   { id: "gpu", label: "GPU", icon: Monitor },
   { id: "motherboard", label: "Motherboard", icon: Layers },
 ];
 
 export default function MobileScannerPage() {
+  const { user } = useAuth();
+  
   // PERSONA STATE: "consumer" | "partner" | "admin"
   const [activePersona, setActivePersona] = useState("consumer");
 
+  useEffect(() => {
+    if (user?.role === "admin") {
+      setActivePersona("admin");
+    } else if (user?.role === "partner") {
+      setActivePersona("partner");
+    } else {
+      setActivePersona("consumer");
+    }
+  }, [user]);
+
   const [selectedPreset, setSelectedPreset] = useState("auto");
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -110,25 +125,44 @@ export default function MobileScannerPage() {
 
   const handleImageSelect = (file) => {
     if (!file) return;
-    setImageFile(file);
+    setImageFiles(prev => [...prev, file]);
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result);
+      setImagePreviews(prev => [...prev, reader.result]);
     };
     reader.readAsDataURL(file);
     setError(null);
   };
 
+  const handleMultipleImagesSelect = (filesList) => {
+    if (!filesList || filesList.length === 0) return;
+    const fileArray = Array.from(filesList);
+    setImageFiles(prev => [...prev, ...fileArray]);
+    fileArray.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+    setError(null);
+  };
+
+  const removeImage = (index) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleFileDrop = (e) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleImageSelect(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleMultipleImagesSelect(e.dataTransfer.files);
     }
   };
 
   const runEvaluation = async () => {
-    if (!imageFile) {
-      setError("Please capture or upload a device photo first.");
+    if (imageFiles.length === 0) {
+      setError("Please capture or upload at least one device photo first.");
       return;
     }
     setLoading(true);
@@ -136,7 +170,7 @@ export default function MobileScannerPage() {
 
     try {
       const res = await evaluateDeviceScan({
-        file: imageFile,
+        files: imageFiles,
         presetCategory: selectedPreset,
         hardwareDiagnostics: diagnostics,
       });
@@ -156,8 +190,8 @@ export default function MobileScannerPage() {
   };
 
   const resetScanner = () => {
-    setImageFile(null);
-    setImagePreview(null);
+    setImageFiles([]);
+    setImagePreviews([]);
     setReportData(null);
     setError(null);
     setSelectedBuyer(null);
@@ -172,7 +206,12 @@ export default function MobileScannerPage() {
       const file = new File([blob], filename, { type: blob.type || "image/png" });
       
       setSelectedPreset("phone");
-      handleImageSelect(file);
+      setImageFiles([file]);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews([reader.result]);
+      };
+      reader.readAsDataURL(file);
       
       if (isBroken) {
         setDiagnostics({
@@ -239,6 +278,17 @@ export default function MobileScannerPage() {
 
           {/* EcoPoints Rewards Button & Controls */}
           <div className="flex items-center gap-1.5">
+            {/* User Profile avatar & name */}
+            <div className="flex items-center gap-1.5 mr-1.5 bg-white/10 px-2 py-1 rounded-xl border border-white/10">
+              <div className="w-5.5 h-5.5 rounded-full bg-[#F3E8FF] text-[#7C3AED] flex items-center justify-center font-mono text-[9px] font-black shadow-inner shrink-0">
+                {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+              </div>
+              <div className="hidden min-[360px]:block leading-none text-left shrink-0">
+                <span className="text-[8px] text-purple-200 font-mono block">USER</span>
+                <span className="text-[9px] font-black font-mono text-white truncate max-w-[55px] block">{user?.name || "Guest"}</span>
+              </div>
+            </div>
+
             {activePersona === "consumer" && (
               <button
                 onClick={() => setShowRewardsModal(true)}
@@ -259,40 +309,12 @@ export default function MobileScannerPage() {
           </div>
         </header>
 
-        {/* PERSONA SWITCHER TABS (Consumer, Kabadiwala Partner, Admin) */}
-        <div className="bg-[#F3E8FF] border-b border-purple-200 px-3 py-2">
-          <div className="grid grid-cols-3 gap-1 p-1 bg-white rounded-2xl border border-purple-200 text-[10px] font-mono font-bold text-center">
-            <button
-              onClick={() => setActivePersona("consumer")}
-              className={`py-1.5 px-2 rounded-xl transition flex items-center justify-center gap-1 ${
-                activePersona === "consumer"
-                  ? "bg-[#7C3AED] text-white shadow-sm font-black"
-                  : "text-purple-700 hover:text-purple-900"
-              }`}
-            >
-              <User size={12} /> Consumer
-            </button>
-            <button
-              onClick={() => setActivePersona("partner")}
-              className={`py-1.5 px-2 rounded-xl transition flex items-center justify-center gap-1 ${
-                activePersona === "partner"
-                  ? "bg-[#7C3AED] text-white shadow-sm font-black"
-                  : "text-purple-700 hover:text-purple-900"
-              }`}
-            >
-              <Truck size={12} /> Partner
-            </button>
-            <button
-              onClick={() => setActivePersona("admin")}
-              className={`py-1.5 px-2 rounded-xl transition flex items-center justify-center gap-1 ${
-                activePersona === "admin"
-                  ? "bg-[#7C3AED] text-white shadow-sm font-black"
-                  : "text-purple-700 hover:text-purple-900"
-              }`}
-            >
-              <ShieldCheck size={12} /> Admin
-            </button>
-          </div>
+        {/* Workspace Role Indicator */}
+        <div className="bg-[#F3E8FF] border-b border-purple-200 px-4 py-2 flex justify-between items-center text-xs font-mono">
+          <span className="text-slate-500">Workspace Portal:</span>
+          <span className="bg-[#7C3AED] text-white px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase">
+            {activePersona === "admin" ? "Admin Supervisor" : activePersona === "partner" ? "Kabadiwala Partner" : "Consumer Portal"}
+          </span>
         </div>
 
         {/* MAIN MOBILE SCREEN VIEWPORT */}
@@ -326,51 +348,7 @@ export default function MobileScannerPage() {
 
               {!reportData ? (
                 <div className="space-y-4">
-                  {/* EasyOCR Dataset Quick Test Gallery */}
-                  <div className="bg-[#F3E8FF]/60 border border-purple-200 rounded-2xl p-3 space-y-2 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-mono font-bold text-[#7C3AED] flex items-center gap-1">
-                        <Sparkles size={13} /> Test Dataset Samples (EasyOCR):
-                      </span>
-                      <span className="text-[10px] text-purple-700 font-mono">1-Tap Load</span>
-                    </div>
 
-                    {/* Broken Phone Samples */}
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-rose-600 font-mono font-bold uppercase tracking-wider block">
-                        🚨 OnePlus / Damaged Samples (Image_brokenphones):
-                      </span>
-                      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                        {["IMG_5411.PNG", "IMG_5407.PNG", "IMG_5408.PNG"].map((filename, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => loadDatasetSample(`/dataset/Image_brokenphones/${filename}`, true)}
-                            className="px-2.5 py-1.5 rounded-xl bg-rose-50 border border-rose-200 hover:border-rose-400 text-rose-700 text-[10px] font-mono shrink-0 flex items-center gap-1 transition"
-                          >
-                            <AlertTriangle size={12} /> {filename === "IMG_5411.PNG" ? "OnePlus Static" : filename.replace(".PNG", "")}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Clean Samples */}
-                    <div className="space-y-1 pt-1">
-                      <span className="text-[10px] text-emerald-700 font-mono font-bold uppercase tracking-wider block">
-                        ✨ Clean OEM Phone Samples (Image_phones):
-                      </span>
-                      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                        {["13.png", "14.png", "15.png"].map((filename, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => loadDatasetSample(`/dataset/Image_phones/${filename}`, false)}
-                            className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 hover:border-emerald-400 text-emerald-700 text-[10px] font-mono shrink-0 flex items-center gap-1 transition"
-                          >
-                            <CheckCircle2 size={12} /> Sample #{filename.replace(".png", "")}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Category Pills */}
                   <div className="space-y-1.5">
@@ -403,31 +381,58 @@ export default function MobileScannerPage() {
                   <div
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={handleFileDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`relative border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 min-h-[240px] ${
-                      imagePreview
-                        ? "border-[#7C3AED] bg-[#F3E8FF]/30"
-                        : "border-purple-200 hover:border-[#7C3AED] bg-white shadow-sm"
+                    onClick={() => {
+                      if (imagePreviews.length === 0) {
+                        fileInputRef.current?.click();
+                      }
+                    }}
+                    className={`relative border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[240px] ${
+                      imagePreviews.length > 0
+                        ? "border-[#7C3AED] bg-[#F3E8FF]/10 cursor-default"
+                        : "border-purple-200 hover:border-[#7C3AED] bg-white shadow-sm cursor-pointer"
                     }`}
                   >
                     <input
                       ref={fileInputRef}
                       type="file"
+                      multiple
                       accept="image/*"
                       capture="environment"
                       className="hidden"
-                      onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
+                      onChange={(e) => e.target.files && handleMultipleImagesSelect(e.target.files)}
                     />
 
-                    {imagePreview ? (
-                      <div className="space-y-3 w-full flex flex-col items-center">
-                        <div className="relative max-h-52 w-full rounded-2xl overflow-hidden border border-purple-200 bg-slate-50 flex items-center justify-center p-2">
-                          <img src={imagePreview} alt="Target Device Scan" className="max-h-48 object-contain" />
-                          <div className="absolute top-2 right-2 bg-[#7C3AED] text-white px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold shadow">
-                            ✓ Image Loaded
+                    {imagePreviews.length > 0 ? (
+                      <div className="space-y-3 w-full" onClick={(e) => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto p-1">
+                          {imagePreviews.map((preview, index) => (
+                            <div key={index} className="relative aspect-video rounded-xl overflow-hidden border border-purple-200 bg-slate-50 flex items-center justify-center p-1 group shadow-sm">
+                              <img src={preview} alt={`Scan angle ${index + 1}`} className="h-full object-contain" />
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold shadow-md hover:bg-rose-600 transition"
+                              >
+                                ✕
+                              </button>
+                              <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.2 rounded font-mono">
+                                Photo {index + 1}
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {/* Add another image box in the grid */}
+                          <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="relative aspect-video rounded-xl border border-dashed border-purple-300 bg-purple-50/50 hover:bg-[#F3E8FF]/30 flex flex-col items-center justify-center cursor-pointer transition text-[#7C3AED]"
+                          >
+                            <Camera size={18} />
+                            <span className="text-[10px] font-mono font-bold mt-1">+ Add Photo</span>
                           </div>
                         </div>
-                        <p className="text-[11px] text-[#7C3AED] font-mono font-semibold">Tap photo to change scan image</p>
+                        <p className="text-[11px] text-[#7C3AED] font-mono font-semibold text-center">
+                          {imagePreviews.length} photo{imagePreviews.length > 1 ? "s" : ""} loaded for multi-angle AI analysis
+                        </p>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -437,7 +442,7 @@ export default function MobileScannerPage() {
                         <div>
                           <p className="text-sm font-black text-slate-900">Scan Electronic Device</p>
                           <p className="text-xs text-slate-500 mt-1">
-                            Photo of Phone, Laptop, Charger, Router, RAM, or SSD
+                            Upload 1 or more photos (front, back, sides) for full inspection
                           </p>
                         </div>
                         <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#F3E8FF] text-[#7C3AED] text-[11px] font-mono border border-purple-300 font-bold">
@@ -457,9 +462,9 @@ export default function MobileScannerPage() {
                   {/* Valuation CTA */}
                   <button
                     onClick={runEvaluation}
-                    disabled={loading || !imageFile}
+                    disabled={loading || imageFiles.length === 0}
                     className={`w-full py-4 rounded-2xl font-black font-mono text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all ${
-                      loading || !imageFile
+                      loading || imageFiles.length === 0
                         ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                         : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-purple-500/25 active:scale-95"
                     }`}
@@ -508,10 +513,10 @@ export default function MobileScannerPage() {
                         </div>
                         <div className="text-right">
                           <span className="bg-[#7C3AED] text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
-                            +₹1,500 Brand Bonus
+                            +₹{(reportData.exchange_bonus_inr || 1500).toLocaleString("en-IN")} Brand Bonus
                           </span>
                           <p className="text-[10px] text-slate-600 font-mono mt-1">
-                            Total Instant Payout: <strong className="text-[#7C3AED]">₹{(reportData.estimated_market_value + 1500).toLocaleString("en-IN")}</strong>
+                            Total Instant Payout: <strong className="text-[#7C3AED]">₹{(reportData.estimated_market_value + (reportData.exchange_bonus_inr || 1500)).toLocaleString("en-IN")}</strong>
                           </p>
                         </div>
                       </div>
@@ -822,8 +827,166 @@ export default function MobileScannerPage() {
   );
 }
 
-function generateLocalFallbackReport(category, diagnostics) {
+function generateLocalFallbackReport(category = "auto", diagnostics = {}) {
+  const cat = (category || "auto").toLowerCase();
   const batteryHealth = diagnostics?.battery_health || 85;
+
+  if (cat === "ram") {
+    return {
+      model_name: "Corsair Vengeance DDR5 32GB (5600MHz)",
+      category: "RAM",
+      estimated_market_value: 6500,
+      health_score: 95,
+      star_rating: 5,
+      physical_condition: "Clean Gold Pins & Heat Spreader",
+      crack_probability_pct: 0,
+      scratch_severity: "None",
+      burnt_trace_detected: false,
+      ecopoints_earned: 250,
+      exchange_bonus_inr: 500,
+      greenscore_kg: 0.15,
+      components: [
+        { name: "DRAM IC Memory Modules", status: "Passed Memory Diagnostic", value_inr: 4500, health_pct: 98 },
+        { name: "Gold Contact Pins", status: "Clean & Uncorroded", value_inr: 1200, health_pct: 95 },
+        { name: "PMIC Voltage Regulator", status: "Nominal Power", value_inr: 800, health_pct: 96 }
+      ],
+      marketplace_bids: [
+        { buyer_name: "Silicon Harvest Spares Hub", offer_type: "Component Resell", offer_amount: 6200, badge: "Highest Offer", delivery_time: "Instant Credit" },
+        { buyer_name: "EcoRecycle Green Metals", offer_type: "Material Recycling", offer_amount: 1500, badge: "Floor Price", delivery_time: "Drop-off" }
+      ]
+    };
+  }
+
+  if (cat === "buds" || cat === "earbuds" || cat === "audio") {
+    return {
+      model_name: "Wings Phantom True Wireless Earbuds",
+      category: "EARBUDS",
+      estimated_market_value: 1800,
+      health_score: 92,
+      star_rating: 5,
+      physical_condition: "Clean Casing & Drivers",
+      crack_probability_pct: 2,
+      scratch_severity: "Minor",
+      burnt_trace_detected: false,
+      ecopoints_earned: 150,
+      exchange_bonus_inr: 300,
+      greenscore_kg: 0.10,
+      components: [
+        { name: "Left Earbud Driver", status: "Functional Audio", value_inr: 500, health_pct: 96 },
+        { name: "Right Earbud Driver", status: "Functional Audio", value_inr: 500, health_pct: 96 },
+        { name: "Charging Case Battery", status: "Healthy Battery", value_inr: 400, health_pct: 90 },
+        { name: "Bluetooth 5.3 Audio Chip", status: "Functional", value_inr: 400, health_pct: 95 }
+      ],
+      marketplace_bids: [
+        { buyer_name: "Refurbisher Alpha (Direct)", offer_type: "Refurbish & Resell", offer_amount: 1750, badge: "Highest Offer", delivery_time: "24 Hours Pickup" },
+        { buyer_name: "EcoRecycle Green Metals", offer_type: "Material Floor", offer_amount: 400, badge: "Guaranteed Floor", delivery_time: "Drop-off" }
+      ]
+    };
+  }
+
+  if (cat === "laptop") {
+    return {
+      model_name: "Dell XPS 15 Intel Core i7 Laptop",
+      category: "LAPTOP",
+      estimated_market_value: 45000,
+      health_score: 89,
+      star_rating: 4,
+      physical_condition: "Minor Chassis Scratches",
+      crack_probability_pct: 5,
+      scratch_severity: "Minor",
+      burnt_trace_detected: false,
+      ecopoints_earned: 1000,
+      exchange_bonus_inr: 2000,
+      greenscore_kg: 1.25,
+      components: [
+        { name: "15.6 Inch FHD IPS Display", status: "Functional", value_inr: 12000, health_pct: 95 },
+        { name: "Core i7 / 16GB RAM Motherboard", status: "Functional", value_inr: 24000, health_pct: 92 },
+        { name: "High-Capacity Li-ion Battery", status: `Healthy (${batteryHealth}%)`, value_inr: 4500, health_pct: batteryHealth },
+        { name: "Aluminum Frame & Keyboard", status: "Minor Scratches", value_inr: 4500, health_pct: 85 }
+      ],
+      marketplace_bids: [
+        { buyer_name: "Refurbisher Alpha (Direct)", offer_type: "Refurbish & Resell", offer_amount: 43500, badge: "Highest Offer", delivery_time: "24 Hours Pickup" },
+        { buyer_name: "Silicon Harvest Spares Hub", offer_type: "Parts Harvesting", offer_amount: 39000, badge: "Best for Reusable Parts", delivery_time: "Instant Credit" }
+      ]
+    };
+  }
+
+  if (cat === "ssd" || cat === "storage") {
+    return {
+      model_name: "Samsung 980 Pro 1TB NVMe SSD",
+      category: "SSD",
+      estimated_market_value: 7200,
+      health_score: 96,
+      star_rating: 5,
+      physical_condition: "Healthy S.M.A.R.T.",
+      crack_probability_pct: 0,
+      scratch_severity: "None",
+      burnt_trace_detected: false,
+      ecopoints_earned: 300,
+      exchange_bonus_inr: 500,
+      greenscore_kg: 0.20,
+      components: [
+        { name: "V-NAND Flash Memory", status: "Healthy S.M.A.R.T.", value_inr: 4800, health_pct: 97 },
+        { name: "PCIe 4.0 Controller", status: "Nominal Temp", value_inr: 1800, health_pct: 96 },
+        { name: "Interface Pin Contacts", status: "Clean", value_inr: 600, health_pct: 95 }
+      ],
+      marketplace_bids: [
+        { buyer_name: "Silicon Harvest Spares Hub", offer_type: "Direct Purchase", offer_amount: 6900, badge: "Highest Offer", delivery_time: "Instant Credit" }
+      ]
+    };
+  }
+
+  if (cat === "gpu" || cat === "graphics") {
+    return {
+      model_name: "NVIDIA GeForce RTX 4070 12GB GDDR6X",
+      category: "GPU",
+      estimated_market_value: 48000,
+      health_score: 94,
+      star_rating: 5,
+      physical_condition: "Intact Heatsink & Fans",
+      crack_probability_pct: 0,
+      scratch_severity: "None",
+      burnt_trace_detected: false,
+      ecopoints_earned: 800,
+      exchange_bonus_inr: 1500,
+      greenscore_kg: 0.85,
+      components: [
+        { name: "AD104 GPU Silicon Die", status: "Passed CUDA Test", value_inr: 30000, health_pct: 96 },
+        { name: "12GB GDDR6X Memory Chips", status: "Functional", value_inr: 12000, health_pct: 95 },
+        { name: "Dual-Fan Heatsink Assembly", status: "Spinning Cleanly", value_inr: 6000, health_pct: 92 }
+      ],
+      marketplace_bids: [
+        { buyer_name: "Refurbisher Alpha (Direct)", offer_type: "Refurbish & Resell", offer_amount: 46000, badge: "Highest Offer", delivery_time: "24 Hours Pickup" }
+      ]
+    };
+  }
+
+  if (cat === "motherboard") {
+    return {
+      model_name: "Dell Latitude OEM Dual-Channel Motherboard",
+      category: "MOTHERBOARD",
+      estimated_market_value: 12000,
+      health_score: 91,
+      star_rating: 5,
+      physical_condition: "All Component Traces Intact",
+      crack_probability_pct: 2,
+      scratch_severity: "None",
+      burnt_trace_detected: false,
+      ecopoints_earned: 400,
+      exchange_bonus_inr: 800,
+      greenscore_kg: 0.40,
+      components: [
+        { name: "System Controller Chipset", status: "Functional", value_inr: 7000, health_pct: 95 },
+        { name: "VRM Power Mosfets", status: "Nominal Power", value_inr: 3200, health_pct: 92 },
+        { name: "I/O Header Ports", status: "Clean Pins", value_inr: 1800, health_pct: 90 }
+      ],
+      marketplace_bids: [
+        { buyer_name: "Silicon Harvest Spares Hub", offer_type: "Component Harvesting", offer_amount: 11200, badge: "Highest Offer", delivery_time: "Instant Credit" }
+      ]
+    };
+  }
+
+  // Fallback for phone / auto
   return {
     model_name: "OnePlus 11 5G",
     category: "PHONE",

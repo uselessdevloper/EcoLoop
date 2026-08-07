@@ -3,9 +3,19 @@ import { apiRequest } from "./api.js";
 /**
  * Service to trigger device evaluation & intelligence report generation.
  */
-export async function evaluateDeviceScan({ file, presetCategory = "auto", hardwareDiagnostics = {}, apiKey, workspaceName, workflowId }) {
+export async function evaluateDeviceScan({ file, files, presetCategory = "auto", hardwareDiagnostics = {}, apiKey, workspaceName, workflowId }) {
   const formData = new FormData();
-  formData.append("file", file);
+  if (file) {
+    formData.append("file", file);
+  }
+  if (files && files.length > 0) {
+    if (!file) {
+      formData.append("file", files[0]);
+    }
+    files.forEach(f => {
+      formData.append("files", f);
+    });
+  }
   formData.append("preset_category", presetCategory);
   
   if (hardwareDiagnostics) {

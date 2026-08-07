@@ -22,19 +22,19 @@ export default function LandingPage() {
     {
       title: "Be Earth Wise",
       subtitle: "Turn informal e-waste into instant UPI payouts, brand exchange bonuses (+₹1,500), and EcoPoints rewards.",
-      icon: "🌱",
+      image: "/images/be_earth_wise.png",
       badge: "Incentive-Driven Network"
     },
     {
       title: "Empower Kabadiwalas",
       subtitle: "Convert informal scrap collectors into verified EcoLoop partners with UID verification and fixed pickup commissions.",
-      icon: "🛵",
+      image: "/images/empower_kabadiwalas.png",
       badge: "Partner UID: KBD-9402"
     },
     {
       title: "EasyOCR & Vision AI",
       subtitle: "Sub-second brand identification for OnePlus, iPhones, Laptops, RAM, & SSDs with CPU-Z hardware verification.",
-      icon: "⚡",
+      image: "/images/easyocr_vision_ai.png",
       badge: "Advanced Vision AI"
     }
   ];
@@ -82,12 +82,17 @@ export default function LandingPage() {
           </span>
 
           {/* Onboarding Graphic Box */}
-          <div className="w-full h-56 rounded-3xl bg-gradient-to-br from-[#F3E8FF] via-white to-purple-50 border border-purple-200 flex flex-col items-center justify-center relative overflow-hidden shadow-inner group">
-            <div className="text-6xl mb-2 animate-bounce duration-1000">
-              {slides[slide].icon}
-            </div>
-            <div className="p-3 rounded-2xl bg-white border border-purple-200 text-[11px] font-mono font-bold text-[#7C3AED] max-w-[85%] shadow-md">
-              Consumer → Kabadiwala Partner → EcoLoop AI
+          <div className="w-full h-56 rounded-3xl border border-purple-200 relative overflow-hidden shadow-inner group bg-slate-50 flex items-center justify-center">
+            <img 
+              src={slides[slide].image} 
+              alt={slides[slide].title}
+              className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+            />
+            {/* Overlay tag for context */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 p-2 px-3 rounded-xl bg-white/95 backdrop-blur-sm border border-purple-100 text-[10px] font-mono font-black text-[#7C3AED] shadow-md truncate max-w-[90%]">
+              {slide === 0 && "Sustainable E-Waste Recycling Flow"}
+              {slide === 1 && "Verified Kabadiwala Pickups & Payouts"}
+              {slide === 2 && "Real-time AI Inspection & Verification"}
             </div>
           </div>
 
@@ -121,7 +126,7 @@ export default function LandingPage() {
                 if (slide < slides.length - 1) {
                   setSlide(slide + 1);
                 } else {
-                  navigate("/mobile");
+                  navigate("/login");
                 }
               }}
               className="w-full py-4 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-black font-mono shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 active:scale-95 transition"
@@ -130,7 +135,7 @@ export default function LandingPage() {
             </button>
 
             <Link
-              to="/mobile"
+              to="/login"
               className="block w-full text-center py-2 text-xs font-mono font-bold text-[#7C3AED] hover:underline"
             >
               Skip Onboarding &amp; Open Scanner →
