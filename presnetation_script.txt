@@ -1,0 +1,27 @@
+This is our Fraud Analytics Dashboard. It gives management a complete overview of all inspection activities.
+
+At the top, we can see the total inspections, fraud cases detected, fraud detection rate, and pending QA reviews.
+
+On the left, we have Vendor Analytics, where we compare vendors based on total inspections, fraud cases, fraud rate, and trust score. This helps identify high-risk suppliers.
+
+We also have Site Analytics, which shows which manufacturing or repair sites have the highest number of fraud cases. This helps identify problem locations quickly.
+
+Below that, we display the Monthly Fraud Trend, so users can track fraud cases over time.
+
+On the right side, we show High-Risk Alerts and recent inspection activities, helping operators focus on critical cases.
+
+Overall, this dashboard provides clear insights for better decision-making.
+
+Now, this is our Admin Dashboard.
+
+Here, the admin can manage the entire inspection system.
+
+One of the key features is Golden Reference Management. The admin can upload genuine OEM part images into the database. These images are used as the reference for future inspections.
+
+The admin can also configure AI thresholds like SSIM score, keypoint matching, and OCR confidence based on business requirements.
+
+We also provide Routing Rules, which define how the system handles different inspection results automatically.
+
+For security, we have Privacy Settings, where the admin can enable image hashing, personal data redaction, and audit logging.
+
+This dashboard allows the admin to manage and configure the platform without changing the source code, making it flexible, secure, and enterprise-ready.
