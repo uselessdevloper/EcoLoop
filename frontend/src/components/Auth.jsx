@@ -83,11 +83,11 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070c18] text-slate-100 font-sans antialiased flex flex-col items-center justify-center p-3 sm:p-6">
-      {/* MOBILE APPLICATION CONTAINER FRAME (Max 430px) Matching Image 1 */}
-      <div className="w-full max-w-[430px] bg-white text-slate-900 rounded-[38px] shadow-2xl overflow-hidden flex flex-col min-h-[720px] relative border border-slate-200">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased flex flex-col items-center justify-center p-3 sm:p-6">
+      {/* MOBILE APPLICATION CONTAINER FRAME (White & Purple Theme) */}
+      <div className="w-full max-w-[430px] bg-white text-slate-900 rounded-[38px] shadow-2xl overflow-hidden flex flex-col min-h-[720px] relative border border-purple-200">
         {/* Mobile Status Bar Simulation */}
-        <div className="bg-[#3D74B6] text-[#FEFFC4] px-6 py-2 flex justify-between items-center text-[11px] font-mono font-bold">
+        <div className="bg-[#7C3AED] text-white px-6 py-2 flex justify-between items-center text-[11px] font-mono font-bold">
           <span>9:41</span>
           <span className="flex items-center gap-1.5">
             <span>5G</span>
@@ -96,29 +96,29 @@ export function LoginForm() {
         </div>
 
         {/* ECOLOOP MOBILE APP HEADER */}
-        <header className="bg-[#3D74B6] px-5 py-3.5 flex justify-between items-center text-white">
+        <header className="bg-[#7C3AED] px-5 py-3.5 flex justify-between items-center text-white shadow-md">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#FEFFC4] text-[#3D74B6] font-black flex items-center justify-center shadow">
+            <div className="w-8 h-8 rounded-xl bg-[#F3E8FF] text-[#7C3AED] font-black flex items-center justify-center shadow">
               <Zap className="w-4.5 h-4.5 fill-current" />
             </div>
             <span className="text-xs font-black tracking-wider uppercase font-mono text-white">
-              ECOLOOP <span className="bg-[#FEFFC4] text-[#3D74B6] text-[9px] px-1 py-0.2 rounded font-mono">APP</span>
+              ECOLOOP <span className="bg-[#F3E8FF] text-[#7C3AED] text-[9px] px-1.5 py-0.2 rounded font-mono">APP</span>
             </span>
           </Link>
 
-          <Link to="/mobile" className="text-xs font-mono font-bold text-[#FEFFC4] hover:underline">
+          <Link to="/mobile" className="text-xs font-mono font-bold text-[#F3E8FF] hover:underline">
             Quick Guest Scan →
           </Link>
         </header>
 
-        {/* MOBILE LOGIN FORM (Matching Image 1) */}
+        {/* MOBILE LOGIN FORM (White & Purple) */}
         <main className="flex-1 px-8 py-8 flex flex-col justify-center space-y-6">
           {/* Persona Switcher Tabs */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block text-center">
+            <label className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider block text-center">
               Select Persona Role:
             </label>
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200 text-[10px] font-mono font-bold">
+            <div className="grid grid-cols-3 gap-1 p-1 bg-[#F3E8FF] rounded-2xl border border-purple-200 text-[10px] font-mono font-bold">
               {Object.keys(ROLE_PRESETS).map((key) => (
                 <button
                   key={key}
@@ -126,8 +126,8 @@ export function LoginForm() {
                   onClick={() => switchRole(key)}
                   className={`py-2 px-1 rounded-xl transition text-center truncate ${
                     roleKey === key
-                      ? "bg-[#3D74B6] text-white shadow-sm font-bold"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-[#7C3AED] text-white shadow-sm font-bold"
+                      : "text-purple-800 hover:text-purple-950"
                   }`}
                 >
                   {ROLE_PRESETS[key].label}
@@ -157,7 +157,7 @@ export function LoginForm() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
-                    className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#3D74B6] focus:outline-none transition"
+                    className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-purple-200 rounded-2xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#7C3AED] focus:outline-none transition"
                     placeholder="Enter full name"
                   />
                 </div>
@@ -168,13 +168,13 @@ export function LoginForm() {
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">Username / Email</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C3AED]" size={16} />
                 <input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   type="text"
-                  className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#3D74B6] focus:outline-none transition font-mono"
+                  className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-purple-200 rounded-2xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#7C3AED] focus:outline-none transition font-mono"
                   placeholder="Username"
                 />
               </div>
@@ -184,13 +184,13 @@ export function LoginForm() {
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">Password</label>
               <div className="relative">
-                <LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
+                <LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C3AED]" size={16} />
                 <input
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   type={showPassword ? "text" : "password"}
-                  className="w-full h-12 pl-10 pr-10 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#3D74B6] focus:outline-none transition font-mono"
+                  className="w-full h-12 pl-10 pr-10 bg-slate-50 border border-purple-200 rounded-2xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#7C3AED] focus:outline-none transition font-mono"
                   placeholder="Password"
                 />
                 <button
@@ -210,7 +210,7 @@ export function LoginForm() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="accent-[#3D74B6] w-4 h-4 rounded"
+                  className="accent-[#7C3AED] w-4 h-4 rounded"
                 />
                 Remember me
               </label>
@@ -220,7 +220,7 @@ export function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 rounded-2xl bg-[#3D74B6] hover:bg-[#2F5F99] text-white text-sm font-black font-mono tracking-wider uppercase shadow-lg shadow-[#3D74B6]/30 active:scale-95 transition"
+              className="w-full py-4 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-black font-mono tracking-wider uppercase shadow-lg shadow-purple-500/25 active:scale-95 transition"
             >
               {loading ? "AUTHENTICATING..." : "LOGIN"}
             </button>
@@ -230,7 +230,7 @@ export function LoginForm() {
           <div className="text-center pt-2">
             <button
               onClick={() => alert("Password reset link sent to registered phone/email.")}
-              className="text-xs font-semibold text-slate-600 hover:text-[#3D74B6] transition"
+              className="text-xs font-semibold text-[#7C3AED] hover:underline transition"
             >
               Forgot your password?
             </button>
@@ -238,8 +238,8 @@ export function LoginForm() {
         </main>
 
         {/* Footer */}
-        <footer className="bg-slate-50 border-t border-slate-200 px-6 py-3 text-center text-[10px] text-slate-500 font-mono">
-          EcoLoop Mobile Login • Partner UID &amp; Consumer Portal
+        <footer className="bg-slate-50 border-t border-purple-100 px-6 py-3 text-center text-[10px] text-slate-500 font-mono">
+          EcoLoop White &amp; Purple Mobile Login • Multi-Persona
         </footer>
       </div>
     </div>

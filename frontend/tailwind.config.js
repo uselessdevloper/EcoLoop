@@ -20,15 +20,16 @@ export default {
           strong: "var(--border-strong)",
         },
         brand: {
-          DEFAULT: "#3D74B6", // EcoLoop Blue Orbit
-          hover: "#2F5F99",
-          light: "#538ACD",
+          DEFAULT: "#7C3AED", // EcoLoop Vibrant Purple
+          hover: "#6D28D9",
+          light: "#A78BFA",
         },
         ecoloop: {
-          blueorbit: "#3D74B6",
-          morninglemon: "#FEFFC4",
-          lemontext: "#3D74B6",
-          lemonbg: "#FEFFC4",
+          purple: "#7C3AED",
+          purpleDark: "#6D28D9",
+          purpleLight: "#F3E8FF",
+          purpleBorder: "#E9D5FF",
+          purpleBadge: "#ECE9FE",
         },
         // Colorblind-safe 4-tier risk scale
         risk: {
