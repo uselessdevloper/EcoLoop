@@ -108,20 +108,23 @@ def call_gemini_vision_ai(
     diagnostics: Dict[str, Any] = {}
 ) -> Optional[Dict[str, Any]]:
     """
-    Calls Gemini 2.5 Flash Vision model on Vertex AI using gcloud CLI authentication token.
+    Calls Gemini 2.5 Flash Vision model using GEMINI_API_KEY from backend/.env or gcloud CLI authentication token.
     Provides real multimodal computer vision analysis of any uploaded electronic asset or e-waste item.
     """
-    token = get_gcloud_token()
-    if not token:
-        return None
-
     try:
         from google import genai
         from google.genai import types
         from google.oauth2.credentials import Credentials
 
-        creds = Credentials(token)
-        client = genai.Client(credentials=creds, vertexai=True, project="waskpilotai", location="us-central1")
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if gemini_key and gemini_key.strip() and not gemini_key.startswith("your_"):
+            client = genai.Client(api_key=gemini_key.strip())
+        else:
+            token = get_gcloud_token()
+            if not token:
+                return None
+            creds = Credentials(token)
+            client = genai.Client(credentials=creds, vertexai=True, project="waskpilotai", location="us-central1")
 
         contents_parts = []
         all_ocr_texts = []
