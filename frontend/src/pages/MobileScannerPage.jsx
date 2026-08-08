@@ -33,7 +33,9 @@ import {
   User,
   Users,
   Headphones,
-  Terminal
+  Terminal,
+  Tag,
+  Gift
 } from "lucide-react";
 import { evaluateDeviceScan } from "../services/evaluationService.js";
 import { runCpuzHardwareDiagnostic } from "../services/cpuzService.js";
@@ -90,6 +92,8 @@ export default function MobileScannerPage() {
   const [reportData, setReportData] = useState(null);
   const [selectedBuyer, setSelectedBuyer] = useState(null);
   const [sellSuccessModal, setSellSuccessModal] = useState(false);
+  const [exchangeCouponModal, setExchangeCouponModal] = useState(false);
+  const [selectedAction, setSelectedAction] = useState(null);
 
   // Kabadiwala Partner Interactive State
   const [partnerPickups, setPartnerPickups] = useState([
@@ -177,13 +181,33 @@ export default function MobileScannerPage() {
             }));
           }
           
-          setCpuzLogs(prev => [
-            ...prev,
-            "--------------------------------------------------",
-            `[SUCCESS] Specs extracted: ${res.specs.Device?.Model}`,
-            `[CPU-Z] Verified RAM: ${res.specs.Memory?.TotalRam} | Battery: ${res.specs.Battery?.Health}`,
-            "Redirecting back to EcoLoop Mobile Scanner..."
-          ]);
+          if (devType === "laptop") {
+            setCpuzLogs([
+              "PS C:\\EcoLoop\\CPU-Z prototype> .\\dump_specs.ps1",
+              "--- CPU-Z Lite Spec Dumper (Native macOS/Laptop Engine) ---",
+              `[Device] Model: ${res.specs.Device?.Model}`,
+              `[CPU] Processor: ${res.specs.CPU?.Processor} (${res.specs.CPU?.Cores} Cores)`,
+              `[Memory] Total RAM: ${res.specs.Memory?.TotalRam}`,
+              `[Battery] Health: ${res.specs.Battery?.Percentage}% (${res.specs.Battery?.Health})`,
+              `[Display] Resolution: ${res.specs.Display?.Resolution}`,
+              "--------------------------------------------------",
+              `[SUCCESS] Real Specs Extracted from ${res.specs.Device?.Brand || 'System'}!`,
+              "Redirecting back to EcoLoop Mobile Scanner..."
+            ]);
+          } else {
+            setCpuzLogs([
+              "Redirecting to CPU-Z Lite Android App (com.cpuz.lite)...",
+              "Intent Launched: cpuz://diagnostics?callback=ecoloop",
+              `[DeviceManager] Model: ${res.specs.Device?.Model}`,
+              `[CpuManager] Processor: ${res.specs.CPU?.Processor} (${res.specs.CPU?.Cores} Cores)`,
+              `[BatteryManager] Health: ${res.specs.Battery?.Percentage}% (${res.specs.Battery?.Health})`,
+              `[MemoryManager] Total RAM: ${res.specs.Memory?.TotalRam}`,
+              `[DisplayManager] Resolution: ${res.specs.Display?.Resolution}`,
+              "--------------------------------------------------",
+              `[SUCCESS] Mobile Spec Instrumentation Dump Completed!`,
+              "Redirecting back to EcoLoop Mobile Scanner..."
+            ]);
+          }
         }
       } catch (err) {
         console.warn("CPU-Z Service call notice:", err);
@@ -479,18 +503,24 @@ export default function MobileScannerPage() {
                           : "Triggers GPay-style app intent launch to CPU-Z Lite Android App (`com.cpuz.lite`) to extract live hardware instrumentation."}
                       </p>
 
-                      <button
-                        type="button"
-                        onClick={() => triggerCpuzFlow(selectedPreset === "laptop" ? "laptop" : "mobile")}
-                        className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-purple-50 text-[#7C3AED] text-xs font-black font-mono shadow-md flex items-center justify-center gap-2 transition transform active:scale-95"
-                      >
-                        <Zap size={16} className="text-amber-500 fill-amber-500" />
-                        {cpuzExtractedSpecs 
-                          ? "✓ Hardware Verified via CPU-Z (Re-Test)" 
-                          : selectedPreset === "laptop" 
-                            ? "Run Laptop Terminal Test (dump_specs.ps1)" 
-                            : "Launch CPU-Z Android App (GPay Switch Flow)"}
-                      </button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => triggerCpuzFlow("laptop")}
+                          className="py-2.5 px-3 rounded-2xl bg-white hover:bg-purple-50 text-[#7C3AED] text-xs font-black font-mono shadow-md flex items-center justify-center gap-1.5 transition transform active:scale-95"
+                        >
+                          <Laptop size={14} className="text-[#7C3AED]" />
+                          Run Laptop Test (MacBook M4)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => triggerCpuzFlow("mobile")}
+                          className="py-2.5 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-xs font-black font-mono border border-white/30 flex items-center justify-center gap-1.5 transition transform active:scale-95"
+                        >
+                          <Smartphone size={14} className="text-amber-300" />
+                          Run Mobile Android App
+                        </button>
+                      </div>
 
                       {cpuzExtractedSpecs && (
                         <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 text-[11px] font-mono space-y-1 border border-white/20 animate-in fade-in">
@@ -653,34 +683,159 @@ export default function MobileScannerPage() {
                     </div>
                   </div>
 
-                  {/* Buyer Bids */}
-                  <div className="bg-white border border-slate-200 rounded-3xl p-4 space-y-3 shadow-sm">
-                    <h3 className="text-xs font-black text-slate-900 font-mono uppercase">Direct Marketplace Offers</h3>
-                    {reportData.marketplace_bids?.map((bid, idx) => (
-                      <div key={idx} className="p-3 rounded-2xl border border-purple-200 bg-[#F8FAFC] flex justify-between items-center">
+                  {/* ECOLOOP CIRCULAR ECONOMY ACTION HUB */}
+                  <div className="bg-white border border-purple-200 rounded-3xl p-4 space-y-4 shadow-sm">
+                    <div className="flex justify-between items-center border-b border-purple-100 pb-2">
+                      <div>
+                        <span className="text-[10px] font-mono text-[#7C3AED] font-bold uppercase tracking-wider block">
+                          EcoLoop Circular Hub
+                        </span>
+                        <h3 className="text-sm font-black text-slate-900 font-mono">
+                          Choose Your Device Action
+                        </h3>
+                      </div>
+                      <span className="bg-[#F3E8FF] text-[#7C3AED] text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border border-purple-300">
+                        4 Pathways Active
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* PATHWAY 1: SELL FOR CASH */}
+                      <div className="p-3.5 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50/60 to-white flex justify-between items-center shadow-sm hover:border-emerald-400 transition">
                         <div>
-                          <span className="text-[9px] font-mono font-bold text-[#7C3AED] bg-[#F3E8FF] px-2 py-0.5 rounded">
-                            {bid.badge}
-                          </span>
-                          <h4 className="text-xs font-bold text-slate-900 mt-1">{bid.buyer_name}</h4>
-                          <p className="text-[10px] text-slate-500 font-mono">{bid.offer_type}</p>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs">💰</span>
+                            <h4 className="text-xs font-bold text-slate-900">Sell for Instant Cash</h4>
+                            <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Instant UPI</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                            Doorstep pickup by Partner Ramesh within 24h
+                          </p>
                         </div>
                         <div className="text-right">
-                          <span className="text-sm font-black font-mono text-emerald-600 block">
-                            ₹{bid.offer_amount?.toLocaleString("en-IN")}
+                          <span className="text-base font-black font-mono text-emerald-600 block">
+                            ₹{reportData.estimated_market_value?.toLocaleString("en-IN")}
                           </span>
                           <button
                             onClick={() => {
-                              setSelectedBuyer(idx);
+                              setSelectedAction({
+                                type: "SELL",
+                                title: "Sell for Instant Cash",
+                                amount: reportData.estimated_market_value,
+                                bonus: 0,
+                                total: reportData.estimated_market_value
+                              });
+                              setSelectedBuyer(0);
                               setSellSuccessModal(true);
                             }}
-                            className="mt-1 px-2.5 py-1 rounded-lg bg-[#7C3AED] text-white text-[10px] font-bold font-mono shadow"
+                            className="mt-1 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold font-mono shadow"
                           >
-                            Accept Offer →
+                            Sell Now →
                           </button>
                         </div>
                       </div>
-                    ))}
+
+                      {/* PATHWAY 2: BRAND EXCHANGE & STORE COUPON VOUCHER (HIGHLIGHTED FEATURE) */}
+                      <div className="p-3.5 rounded-2xl border-2 border-[#7C3AED] bg-gradient-to-r from-[#F3E8FF] via-white to-purple-50 flex justify-between items-center shadow-md relative overflow-hidden group">
+                        <div className="space-y-1 max-w-[65%]">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs">🎁</span>
+                            <h4 className="text-xs font-black text-slate-900">Brand Exchange &amp; Store Coupon</h4>
+                          </div>
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#7C3AED] text-white text-[10px] font-mono font-bold">
+                            <Tag size={12} /> +₹5,000 Coupon Deducted at Checkout
+                          </div>
+                          <p className="text-[10px] text-purple-900 font-sans leading-tight">
+                            Trade in + get <strong>₹5,000 Extra Voucher Bonus</strong> when buying any device on EcoLoop Store!
+                          </p>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-xs text-slate-400 font-mono line-through block">
+                            ₹{reportData.estimated_market_value?.toLocaleString("en-IN")}
+                          </span>
+                          <span className="text-lg font-black font-mono text-[#7C3AED] block">
+                            ₹{(reportData.estimated_market_value + 5000)?.toLocaleString("en-IN")}
+                          </span>
+                          <button
+                            onClick={() => setExchangeCouponModal(true)}
+                            className="mt-1 px-3 py-1.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-[10px] font-black font-mono shadow-md animate-pulse"
+                          >
+                            Claim ₹5,000 Coupon →
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* PATHWAY 3: REPAIR & KEEP */}
+                      <div className="p-3.5 rounded-2xl border border-purple-200 bg-slate-50 flex justify-between items-center shadow-sm">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs">🛠️</span>
+                            <h4 className="text-xs font-bold text-slate-900">Repair &amp; Keep Device</h4>
+                            <span className="text-[9px] font-mono font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">Save 90%</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                            Certified OEM service with 6-month warranty
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-black font-mono text-purple-700 block">
+                            Est. ₹4,500
+                          </span>
+                          <button
+                            onClick={() => {
+                              setSelectedAction({
+                                type: "REPAIR",
+                                title: "Book Certified OEM Repair",
+                                amount: 4500,
+                                bonus: 0,
+                                total: 4500
+                              });
+                              setSelectedBuyer(0);
+                              setSellSuccessModal(true);
+                            }}
+                            className="mt-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold font-mono shadow"
+                          >
+                            Book Repair →
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* PATHWAY 4: RECYCLE RESPONSIBLY */}
+                      <div className="p-3.5 rounded-2xl border border-amber-200 bg-amber-50/40 flex justify-between items-center shadow-sm">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs">♻️</span>
+                            <h4 className="text-xs font-bold text-slate-900">Recycle Responsibly</h4>
+                            <span className="text-[9px] font-mono font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">+500 EcoPoints</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                            Guaranteed zero e-waste landfill green certificate
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-black font-mono text-amber-700 block">
+                            ₹2,500 Floor
+                          </span>
+                          <button
+                            onClick={() => {
+                              setSelectedAction({
+                                type: "RECYCLE",
+                                title: "Recycle & Claim Green Certificate",
+                                amount: 2500,
+                                bonus: 500,
+                                total: 2500
+                              });
+                              setSelectedBuyer(0);
+                              setSellSuccessModal(true);
+                            }}
+                            className="mt-1 px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold font-mono shadow"
+                          >
+                            Recycle Now →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <button
@@ -919,20 +1074,114 @@ export default function MobileScannerPage() {
           </div>
         )}
 
+        {/* BRAND EXCHANGE & STORE COUPON DEDUCTION MODAL */}
+        {exchangeCouponModal && reportData && (
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-purple-300 flex flex-col space-y-4 p-5">
+              {/* Voucher Header */}
+              <div className="flex justify-between items-start border-b border-purple-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-2xl bg-[#7C3AED] text-white flex items-center justify-center font-black shadow-md">
+                    🎁
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-[#7C3AED] font-bold uppercase tracking-wider block">
+                      EcoLoop Exchange Voucher
+                    </span>
+                    <h3 className="text-base font-black text-slate-900 font-mono">
+                      Brand Bonus Coupon
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setExchangeCouponModal(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xs font-mono font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Coupon Ticket */}
+              <div className="bg-gradient-to-br from-[#7C3AED] via-purple-700 to-indigo-800 text-white rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-lg border border-purple-400/40">
+                <div className="flex justify-between items-center text-[10px] font-mono text-purple-200">
+                  <span>COUPON CODE:</span>
+                  <span className="bg-white/20 px-2 py-0.5 rounded font-bold text-amber-300">ECO-BRAND-5K-BONUS</span>
+                </div>
+
+                <div className="text-center py-1">
+                  <span className="text-xs text-purple-200 font-mono block">TOTAL EXCHANGE VALUE CREDIT</span>
+                  <span className="text-3xl font-black font-mono text-amber-300 tracking-tight">
+                    ₹{(reportData.estimated_market_value + 5000)?.toLocaleString("en-IN")}
+                  </span>
+                  <span className="text-[10px] text-purple-100 block font-mono mt-0.5">
+                    (₹{reportData.estimated_market_value?.toLocaleString("en-IN")} Trade-in + ₹5,000 Brand Coupon)
+                  </span>
+                </div>
+              </div>
+
+              {/* Checkout Calculation Simulation */}
+              <div className="bg-slate-50 rounded-2xl p-3 border border-purple-200 space-y-2 font-mono text-xs">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block border-b border-slate-200 pb-1">
+                  Simulated Store Checkout Deduction
+                </span>
+
+                <div className="flex justify-between text-slate-600">
+                  <span>New Store Purchase Price:</span>
+                  <span className="font-bold text-slate-900">₹1,20,000</span>
+                </div>
+                <div className="flex justify-between text-emerald-600">
+                  <span>- Trade-in Asset Value:</span>
+                  <span className="font-bold">-₹{reportData.estimated_market_value?.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between text-[#7C3AED] font-bold">
+                  <span>- Brand Loyalty Coupon Bonus:</span>
+                  <span>-₹5,000</span>
+                </div>
+
+                <div className="flex justify-between border-t border-slate-300 pt-1.5 font-black text-sm text-slate-900">
+                  <span>YOU PAY AT CHECKOUT:</span>
+                  <span className="text-[#7C3AED]">₹{(120000 - reportData.estimated_market_value - 5000)?.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setExchangeCouponModal(false);
+                  setSelectedAction({
+                    type: "EXCHANGE",
+                    title: "Brand Exchange & ₹5,000 Coupon Applied",
+                    amount: reportData.estimated_market_value,
+                    bonus: 5000,
+                    total: reportData.estimated_market_value + 5000
+                  });
+                  setSelectedBuyer(0);
+                  setSellSuccessModal(true);
+                }}
+                className="w-full py-3.5 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black font-mono shadow-lg flex items-center justify-center gap-2"
+              >
+                <Tag size={16} className="text-amber-300" />
+                Apply Coupon &amp; Continue Exchange →
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TRANSACTION CONFIRMATION MODAL */}
-        {sellSuccessModal && selectedBuyer !== null && (
+        {sellSuccessModal && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white border border-purple-300 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
               <div className="w-14 h-14 rounded-full bg-[#F3E8FF] text-[#7C3AED] flex items-center justify-center mx-auto shadow-md">
                 <CheckCircle2 size={32} />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-900 font-mono">Offer Accepted!</h3>
+                <h3 className="text-lg font-black text-slate-900 font-mono">
+                  {selectedAction?.title || "Action Confirmed!"}
+                </h3>
                 <p className="text-xs text-slate-600 mt-1">
-                  Partner Ramesh (UID: KBD-9402) assigned for doorstep pickup.
+                  Partner Ramesh (UID: KBD-9402) assigned for doorstep pickup &amp; verification.
                 </p>
                 <p className="text-2xl font-black text-emerald-600 font-mono mt-2">
-                  Instant UPI: ₹{reportData.marketplace_bids[selectedBuyer]?.offer_amount?.toLocaleString("en-IN")}
+                  Total Value: ₹{(selectedAction?.total || reportData?.estimated_market_value)?.toLocaleString("en-IN")}
                 </p>
               </div>
               <button
