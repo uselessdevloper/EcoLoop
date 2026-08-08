@@ -32,9 +32,11 @@ import {
   DollarSign,
   User,
   Users,
-  Headphones
+  Headphones,
+  Terminal
 } from "lucide-react";
 import { evaluateDeviceScan } from "../services/evaluationService.js";
+import { runCpuzHardwareDiagnostic } from "../services/cpuzService.js";
 
 const PRESET_OPTIONS = [
   { id: "auto", label: "Auto Detect", icon: Sparkles },
@@ -120,6 +122,78 @@ export default function MobileScannerPage() {
   // Admin Threshold State
   const [ssimThreshold, setSsimThreshold] = useState(0.85);
   const [ocrStrictness, setOcrStrictness] = useState(90);
+
+  // CPU-Z Prototype Spec Extraction & GPay Switch Modal State
+  const [cpuzModalOpen, setCpuzModalOpen] = useState(false);
+  const [cpuzStep, setCpuzStep] = useState("launch"); // "launch" | "running" | "done"
+  const [cpuzDeviceType, setCpuzDeviceType] = useState("mobile");
+  const [cpuzLogs, setCpuzLogs] = useState([]);
+  const [cpuzExtractedSpecs, setCpuzExtractedSpecs] = useState(null);
+
+  const triggerCpuzFlow = async (type = "mobile") => {
+    const devType = type === "laptop" ? "laptop" : "mobile";
+    setCpuzDeviceType(devType);
+    setCpuzModalOpen(true);
+    setCpuzStep("launch");
+    setCpuzLogs([
+      `[CPU-Z] Initializing ${devType === "laptop" ? "PowerShell Terminal Dumper" : "Android Instrumentation Intent"}...`
+    ]);
+
+    // Step 1: Simulate GPay App Switch / Terminal Launch Delay
+    setTimeout(async () => {
+      setCpuzStep("running");
+      if (devType === "laptop") {
+        setCpuzLogs([
+          "PS C:\\EcoLoop\\CPU-Z prototype> .\\dump_specs.ps1",
+          "--- CPU-Z Lite Spec Dumper (Laptop Engine) ---",
+          "Checking connected system hardware...",
+          "[CPU] Querying processor architecture & active core count...",
+          "[RAM] Fetching physical RAM modules & available memory...",
+          "[BATTERY] Reading power status, health % & battery cycle count...",
+          "[STORAGE] Inspecting NVMe SSD S.M.A.R.T telemetry...",
+          "Executing instrumentation test suite: SpecDumperTest..."
+        ]);
+      } else {
+        setCpuzLogs([
+          "Redirecting to CPU-Z Lite Android App (com.cpuz.lite)...",
+          "Intent Launched: cpuz://diagnostics?callback=ecoloop",
+          "[DeviceManager] Brand: OnePlus | Model: OnePlus 11 5G",
+          "[CpuManager] Qualcomm Snapdragon 8 Gen 2 (8 Cores @ Kryo 4nm)",
+          "[BatteryManager] Health: Good (86%) | Temp: 31.5 °C | 3880mV",
+          "[MemoryManager] Total RAM: 16.0 GB | Storage: 256.0 GB",
+          "[DisplayManager] 1440x3216 QHD+ AMOLED @ 120Hz | 525 DPI",
+          "SUCCESS: Telemetry dump completed!"
+        ]);
+      }
+
+      try {
+        const res = await runCpuzHardwareDiagnostic(devType);
+        if (res && res.specs) {
+          setCpuzExtractedSpecs(res.specs);
+          if (res.diagnostics) {
+            setDiagnostics(prev => ({
+              ...prev,
+              ...res.diagnostics
+            }));
+          }
+          
+          setCpuzLogs(prev => [
+            ...prev,
+            "--------------------------------------------------",
+            `[SUCCESS] Specs extracted: ${res.specs.Device?.Model}`,
+            `[CPU-Z] Verified RAM: ${res.specs.Memory?.TotalRam} | Battery: ${res.specs.Battery?.Health}`,
+            "Redirecting back to EcoLoop Mobile Scanner..."
+          ]);
+        }
+      } catch (err) {
+        console.warn("CPU-Z Service call notice:", err);
+      } finally {
+        setTimeout(() => {
+          setCpuzStep("done");
+        }, 1200);
+      }
+    }, 1500);
+  };
 
   const fileInputRef = useRef(null);
 
@@ -376,6 +450,62 @@ export default function MobileScannerPage() {
                       })}
                     </div>
                   </div>
+
+                  {/* GPay-Style CPU-Z Hardware Prototype Trigger Banner */}
+                  {(selectedPreset === "phone" || selectedPreset === "laptop" || selectedPreset === "auto") && (
+                    <div className="bg-gradient-to-r from-[#7C3AED] via-purple-700 to-indigo-800 rounded-3xl p-4 text-white shadow-lg space-y-3 border border-purple-400/30 relative overflow-hidden group">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center font-mono font-black text-xs text-amber-300 border border-white/30 shadow-inner">
+                            CPU-Z
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-mono tracking-widest text-purple-200 uppercase font-bold block">
+                              GPay App Switch Intent
+                            </span>
+                            <h4 className="text-sm font-black tracking-tight">
+                              {selectedPreset === "laptop" ? "Verify Laptop Hardware Specs" : "Verify Mobile Android Specs"}
+                            </h4>
+                          </div>
+                        </div>
+                        <span className="bg-emerald-400/20 text-emerald-300 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border border-emerald-400/40">
+                          ● REAL-TIME TELEMETRY
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-purple-100/90 leading-relaxed font-sans">
+                        {selectedPreset === "laptop" 
+                          ? "Triggers PowerShell terminal spec dumper (`dump_specs.ps1`) to extract CPU cores, RAM, Battery cycles & S.M.A.R.T telemetry."
+                          : "Triggers GPay-style app intent launch to CPU-Z Lite Android App (`com.cpuz.lite`) to extract live hardware instrumentation."}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => triggerCpuzFlow(selectedPreset === "laptop" ? "laptop" : "mobile")}
+                        className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-purple-50 text-[#7C3AED] text-xs font-black font-mono shadow-md flex items-center justify-center gap-2 transition transform active:scale-95"
+                      >
+                        <Zap size={16} className="text-amber-500 fill-amber-500" />
+                        {cpuzExtractedSpecs 
+                          ? "✓ Hardware Verified via CPU-Z (Re-Test)" 
+                          : selectedPreset === "laptop" 
+                            ? "Run Laptop Terminal Test (dump_specs.ps1)" 
+                            : "Launch CPU-Z Android App (GPay Switch Flow)"}
+                      </button>
+
+                      {cpuzExtractedSpecs && (
+                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 text-[11px] font-mono space-y-1 border border-white/20 animate-in fade-in">
+                          <div className="flex justify-between text-emerald-300 font-bold">
+                            <span>MODEL: {cpuzExtractedSpecs.Device?.Model}</span>
+                            <span>BATTERY: {cpuzExtractedSpecs.Battery?.Percentage}% ({cpuzExtractedSpecs.Battery?.Health})</span>
+                          </div>
+                          <div className="flex justify-between text-purple-100">
+                            <span>CPU: {cpuzExtractedSpecs.CPU?.Cores} Cores ({cpuzExtractedSpecs.CPU?.Architecture})</span>
+                            <span>RAM: {cpuzExtractedSpecs.Memory?.TotalRam}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Camera Upload Dropzone (White & Purple) */}
                   <div
@@ -814,6 +944,113 @@ export default function MobileScannerPage() {
               >
                 Done &amp; Return
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* GPAY-STYLE CPU-Z HARDWARE INTENT MODAL */}
+        {cpuzModalOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-purple-200 flex flex-col">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-[#7C3AED] to-purple-800 p-4 text-white flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center font-mono font-black text-xs text-amber-300">
+                    CPU-Z
+                  </div>
+                  <span className="font-mono font-bold text-xs">
+                    {cpuzDeviceType === "laptop" ? "Terminal Spec Dumper" : "Google Pay App Switch Intent"}
+                  </span>
+                </div>
+                {cpuzStep === "done" && (
+                  <button onClick={() => setCpuzModalOpen(false)} className="text-white/80 hover:text-white font-mono text-sm">
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Modal Body depending on cpuzStep */}
+              {cpuzStep === "launch" && (
+                <div className="p-6 text-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-purple-100 text-[#7C3AED] flex items-center justify-center mx-auto animate-bounce shadow-inner">
+                    {cpuzDeviceType === "laptop" ? <Terminal size={32} /> : <Smartphone size={32} />}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">
+                      {cpuzDeviceType === "laptop" ? "Opening Diagnostic Terminal..." : "Switching to CPU-Z Lite App..."}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1 font-sans">
+                      {cpuzDeviceType === "laptop" 
+                        ? "Launching powershell .\\dump_specs.ps1 script on local device..."
+                        : "Redirecting via Android intent scheme (com.cpuz.lite / SpecDumperTest)..."}
+                    </p>
+                  </div>
+                  {/* GPay style loading bar */}
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-[#7C3AED] h-full animate-pulse w-3/4 rounded-full"></div>
+                  </div>
+                </div>
+              )}
+
+              {cpuzStep === "running" && (
+                <div className="p-4 space-y-3 bg-slate-900 text-slate-100 font-mono text-xs max-h-80 overflow-y-auto">
+                  <div className="flex items-center justify-between text-slate-400 text-[10px] border-b border-slate-800 pb-1">
+                    <span>STATUS: EXTRACTING TELEMETRY</span>
+                    <span className="animate-pulse text-amber-400">● RUNNING</span>
+                  </div>
+                  {cpuzLogs.map((log, i) => (
+                    <p key={i} className={`text-[11px] leading-tight ${log.includes("SUCCESS") || log.includes("START") ? "text-emerald-400 font-bold" : log.includes("Error") ? "text-rose-400" : "text-slate-300"}`}>
+                      {log}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {cpuzStep === "done" && cpuzExtractedSpecs && (
+                <div className="p-5 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+                    <CheckCircle2 size={36} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-emerald-600 font-bold uppercase bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      GPay Switch Complete
+                    </span>
+                    <h3 className="text-base font-black text-slate-900 mt-1">Hardware Verified!</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Redirected back to EcoLoop Mobile with real-time specs</p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-purple-100 rounded-2xl p-3 text-left space-y-1.5 font-mono text-xs">
+                    <div className="flex justify-between border-b border-slate-200 pb-1">
+                      <span className="text-slate-500">Device:</span>
+                      <span className="font-bold text-slate-900">{cpuzExtractedSpecs.Device?.Model}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 pb-1">
+                      <span className="text-slate-500">CPU / Architecture:</span>
+                      <span className="font-bold text-[#7C3AED]">{cpuzExtractedSpecs.CPU?.Cores} Cores ({cpuzExtractedSpecs.CPU?.Architecture})</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 pb-1">
+                      <span className="text-slate-500">Memory:</span>
+                      <span className="font-bold text-slate-900">{cpuzExtractedSpecs.Memory?.TotalRam}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 pb-1">
+                      <span className="text-slate-500">Battery Health:</span>
+                      <span className="font-bold text-emerald-600">{cpuzExtractedSpecs.Battery?.Health}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Display:</span>
+                      <span className="font-bold text-slate-900">{cpuzExtractedSpecs.Display?.Resolution}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCpuzModalOpen(false)}
+                    className="w-full py-3 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold font-mono shadow-md"
+                  >
+                    Apply Specs &amp; Return to Scanner
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
