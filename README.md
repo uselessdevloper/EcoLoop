@@ -920,8 +920,6 @@ Released under the **MIT License** — see [LICENSE.md](LICENSE.md).
 Further technical depth on the agents, RBAC personas, demo walkthrough, and reporting internals lives in [AGENTS.md](AGENTS.md).
 
 <p align="center">
-  <strong>EcoLoop · VeriVision AI</strong><br />
-  <em>Built for the Dell FutureMind AI Hackathon Grand Final 2026</em><br /><br />
   <strong>Team 24x7</strong><br />
-  Utkar Sinha · Mishkan Gupta · Somya Sagar Naik · Abhijit Chaudhary · Subham Sadangi
+  Utkarsh Sinha · Muskan Gupta · Soumya Sagar Naik · Abhijit Chaudhary · Subham Sadangi
 </p>
