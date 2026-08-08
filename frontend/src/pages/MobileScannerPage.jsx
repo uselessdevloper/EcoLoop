@@ -774,32 +774,48 @@ export default function MobileScannerPage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs">🛠️</span>
                             <h4 className="text-xs font-bold text-slate-900">Repair &amp; Keep Device</h4>
-                            <span className="text-[9px] font-mono font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">Save 90%</span>
+                            <span className="text-[9px] font-mono font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">
+                              {reportData.estimated_market_value < 500 ? "N/A (Scrap Item)" : "Save 90%"}
+                            </span>
                           </div>
                           <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                            Certified OEM service with 6-month warranty
+                            {reportData.estimated_market_value < 500 
+                              ? "Item is non-repairable fused e-waste scrap" 
+                              : "Certified OEM service with 6-month warranty"}
                           </p>
                         </div>
                         <div className="text-right">
                           <span className="text-sm font-black font-mono text-purple-700 block">
-                            Est. ₹4,500
+                            {reportData.estimated_market_value < 500 
+                              ? "N/A" 
+                              : `Est. ₹${Math.round(reportData.estimated_market_value * 0.15)?.toLocaleString("en-IN")}`}
                           </span>
-                          <button
-                            onClick={() => {
-                              setSelectedAction({
-                                type: "REPAIR",
-                                title: "Book Certified OEM Repair",
-                                amount: 4500,
-                                bonus: 0,
-                                total: 4500
-                              });
-                              setSelectedBuyer(0);
-                              setSellSuccessModal(true);
-                            }}
-                            className="mt-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold font-mono shadow"
-                          >
-                            Book Repair →
-                          </button>
+                          {reportData.estimated_market_value < 500 ? (
+                            <button
+                              disabled
+                              className="mt-1 px-2.5 py-1 rounded-lg bg-slate-200 text-slate-400 text-[10px] font-bold font-mono cursor-not-allowed"
+                            >
+                              Non-Repairable
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                const repairCost = Math.round(reportData.estimated_market_value * 0.15);
+                                setSelectedAction({
+                                  type: "REPAIR",
+                                  title: "Book Certified OEM Repair",
+                                  amount: repairCost,
+                                  bonus: 0,
+                                  total: repairCost
+                                });
+                                setSelectedBuyer(0);
+                                setSellSuccessModal(true);
+                              }}
+                              className="mt-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold font-mono shadow"
+                            >
+                              Book Repair →
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -809,7 +825,9 @@ export default function MobileScannerPage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs">♻️</span>
                             <h4 className="text-xs font-bold text-slate-900">Recycle Responsibly</h4>
-                            <span className="text-[9px] font-mono font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">+500 EcoPoints</span>
+                            <span className="text-[9px] font-mono font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                              +{reportData.ecopoints_earned || 50} EcoPoints
+                            </span>
                           </div>
                           <p className="text-[10px] text-slate-500 font-mono mt-0.5">
                             Guaranteed zero e-waste landfill green certificate
@@ -817,16 +835,16 @@ export default function MobileScannerPage() {
                         </div>
                         <div className="text-right">
                           <span className="text-sm font-black font-mono text-amber-700 block">
-                            ₹2,500 Floor
+                            ₹{reportData.estimated_market_value?.toLocaleString("en-IN")} Scrap Payout
                           </span>
                           <button
                             onClick={() => {
                               setSelectedAction({
                                 type: "RECYCLE",
                                 title: "Recycle & Claim Green Certificate",
-                                amount: 2500,
-                                bonus: 500,
-                                total: 2500
+                                amount: reportData.estimated_market_value,
+                                bonus: reportData.ecopoints_earned || 50,
+                                total: reportData.estimated_market_value
                               });
                               setSelectedBuyer(0);
                               setSellSuccessModal(true);
