@@ -475,7 +475,7 @@ export default function MobileScannerPage() {
                   </div>
 
                   {/* GPay-Style CPU-Z Hardware Prototype Trigger Banner */}
-                  {(selectedPreset === "phone" || selectedPreset === "laptop" || selectedPreset === "auto") && (
+                  {(selectedPreset === "phone" || selectedPreset === "laptop") && (
                     <div className="bg-gradient-to-r from-[#7C3AED] via-purple-700 to-indigo-800 rounded-3xl p-4 text-white shadow-lg space-y-3 border border-purple-400/30 relative overflow-hidden group">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-2">
