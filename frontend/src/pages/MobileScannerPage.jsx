@@ -53,7 +53,7 @@ const PRESET_OPTIONS = [
 
 export default function MobileScannerPage() {
   const { user } = useAuth();
-  
+
   // PERSONA STATE: "consumer" | "partner" | "admin"
   const [activePersona, setActivePersona] = useState("consumer");
 
@@ -87,7 +87,7 @@ export default function MobileScannerPage() {
   // Settings & Incentive Drawer states
   const [showSettings, setShowSettings] = useState(false);
   const [showRewardsModal, setShowRewardsModal] = useState(false);
-  
+
   // Inspection Report Output
   const [reportData, setReportData] = useState(null);
   const [selectedBuyer, setSelectedBuyer] = useState(null);
@@ -180,7 +180,7 @@ export default function MobileScannerPage() {
               ...res.diagnostics
             }));
           }
-          
+
           if (devType === "laptop") {
             setCpuzLogs([
               "PS C:\\EcoLoop\\CPU-Z prototype> .\\dump_specs.ps1",
@@ -302,7 +302,7 @@ export default function MobileScannerPage() {
       const blob = await resp.blob();
       const filename = samplePath.split("/").pop() || "sample.png";
       const file = new File([blob], filename, { type: blob.type || "image/png" });
-      
+
       setSelectedPreset("phone");
       setImageFiles([file]);
       const reader = new FileReader();
@@ -310,7 +310,7 @@ export default function MobileScannerPage() {
         setImagePreviews([reader.result]);
       };
       reader.readAsDataURL(file);
-      
+
       if (isBroken) {
         setDiagnostics({
           display_touch: false,
@@ -461,11 +461,10 @@ export default function MobileScannerPage() {
                           <button
                             key={opt.id}
                             onClick={() => setSelectedPreset(opt.id)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold font-mono flex items-center gap-1.5 shrink-0 transition-all border ${
-                              isSelected
+                            className={`px-3 py-2 rounded-xl text-xs font-bold font-mono flex items-center gap-1.5 shrink-0 transition-all border ${isSelected
                                 ? "bg-[#7C3AED] text-white border-[#7C3AED] shadow-md"
                                 : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
-                            }`}
+                              }`}
                           >
                             <Icon size={14} />
                             {opt.label}
@@ -498,7 +497,7 @@ export default function MobileScannerPage() {
                       </div>
 
                       <p className="text-xs text-purple-100/90 leading-relaxed font-sans">
-                        {selectedPreset === "laptop" 
+                        {selectedPreset === "laptop"
                           ? "Triggers PowerShell terminal spec dumper (`dump_specs.ps1`) to extract CPU cores, RAM, Battery cycles & S.M.A.R.T telemetry."
                           : "Triggers GPay-style app intent launch to CPU-Z Lite Android App (`com.cpuz.lite`) to extract live hardware instrumentation."}
                       </p>
@@ -546,11 +545,10 @@ export default function MobileScannerPage() {
                         fileInputRef.current?.click();
                       }
                     }}
-                    className={`relative border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[240px] ${
-                      imagePreviews.length > 0
+                    className={`relative border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[240px] ${imagePreviews.length > 0
                         ? "border-[#7C3AED] bg-[#F3E8FF]/10 cursor-default"
                         : "border-purple-200 hover:border-[#7C3AED] bg-white shadow-sm cursor-pointer"
-                    }`}
+                      }`}
                   >
                     <input
                       ref={fileInputRef}
@@ -580,9 +578,9 @@ export default function MobileScannerPage() {
                               </div>
                             </div>
                           ))}
-                          
+
                           {/* Add another image box in the grid */}
-                          <div 
+                          <div
                             onClick={() => fileInputRef.current?.click()}
                             className="relative aspect-video rounded-xl border border-dashed border-purple-300 bg-purple-50/50 hover:bg-[#F3E8FF]/30 flex flex-col items-center justify-center cursor-pointer transition text-[#7C3AED]"
                           >
@@ -623,11 +621,10 @@ export default function MobileScannerPage() {
                   <button
                     onClick={runEvaluation}
                     disabled={loading || imageFiles.length === 0}
-                    className={`w-full py-4 rounded-2xl font-black font-mono text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all ${
-                      loading || imageFiles.length === 0
+                    className={`w-full py-4 rounded-2xl font-black font-mono text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all ${loading || imageFiles.length === 0
                         ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                         : "bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-purple-500/25 active:scale-95"
-                    }`}
+                      }`}
                   >
                     {loading ? (
                       <>
@@ -657,13 +654,12 @@ export default function MobileScannerPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] text-slate-500 font-mono block">HEALTH SCORE</span>
-                        <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-mono font-black text-sm border ${
-                          reportData.health_score >= 80 
-                            ? "bg-emerald-100 border-emerald-300 text-emerald-700" 
-                            : reportData.health_score >= 50 
-                              ? "bg-amber-100 border-amber-300 text-amber-700" 
+                        <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-mono font-black text-sm border ${reportData.health_score >= 80
+                            ? "bg-emerald-100 border-emerald-300 text-emerald-700"
+                            : reportData.health_score >= 50
+                              ? "bg-amber-100 border-amber-300 text-amber-700"
                               : "bg-rose-100 border-rose-300 text-rose-700"
-                        }`}>
+                          }`}>
                           <ShieldCheck size={16} /> {reportData.health_score}/100
                         </div>
                       </div>
@@ -911,11 +907,10 @@ export default function MobileScannerPage() {
                           <MapPin size={12} className="text-purple-600" /> {item.address}
                         </p>
                       </div>
-                      <span className={`px-2 py-1 rounded-xl text-[10px] font-mono font-black ${
-                        item.status === "COMPLETED"
+                      <span className={`px-2 py-1 rounded-xl text-[10px] font-mono font-black ${item.status === "COMPLETED"
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-amber-100 text-amber-800"
-                      }`}>
+                        }`}>
                         {item.status === "COMPLETED" ? "✓ PICKED UP" : "PENDING"}
                       </span>
                     </div>
@@ -1235,7 +1230,7 @@ export default function MobileScannerPage() {
                       {cpuzDeviceType === "laptop" ? "Opening Diagnostic Terminal..." : "Switching to CPU-Z Lite App..."}
                     </h3>
                     <p className="text-xs text-slate-500 mt-1 font-sans">
-                      {cpuzDeviceType === "laptop" 
+                      {cpuzDeviceType === "laptop"
                         ? "Launching powershell .\\dump_specs.ps1 script on local device..."
                         : "Redirecting via Android intent scheme (com.cpuz.lite / SpecDumperTest)..."}
                     </p>

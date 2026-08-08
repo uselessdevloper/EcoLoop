@@ -109,21 +109,26 @@ def call_gemini_vision_ai(
 ) -> Optional[Dict[str, Any]]:
     """
     Calls Gemini 2.5 Flash Vision model on Vertex AI using gcloud CLI authentication token.
-    Provides real multimodal computer vision analysis of the uploaded electronic asset photos.
+    Provides real multimodal computer vision analysis of any uploaded electronic asset or e-waste item.
     """
     token = get_gcloud_token()
     if not token:
         return None
 
     try:
-        parts = []
+        from google import genai
+        from google.genai import types
+        from google.oauth2.credentials import Credentials
+
+        creds = Credentials(token)
+        client = genai.Client(credentials=creds, vertexai=True, project="waskpilotai", location="us-central1")
+
+        contents_parts = []
         all_ocr_texts = []
-        
-        # Process each image, compress, base64 encode and extract OCR
+
         for idx, img_bytes in enumerate(images):
             compressed_bytes, mime_type = compress_image_for_ai(img_bytes)
-            b64_img = base64.b64encode(compressed_bytes).decode("utf-8")
-            parts.append({"inlineData": {"mimeType": mime_type, "data": b64_img}})
+            contents_parts.append(types.Part.from_bytes(data=compressed_bytes, mime_type=mime_type))
             
             ocr_text = extract_ocr_text_from_image(img_bytes)
             if ocr_text:
@@ -133,34 +138,30 @@ def call_gemini_vision_ai(
         logger.info(f"Combined OCR text tokens: '{combined_ocr}'")
 
         prompt = (
-            f"You are a world-class hardware quality inspection AI for EcoLoop. Inspect these electronic asset photos (multiple views are provided) with extreme precision.\n\n"
+            f"You are the master hardware quality & e-waste inspection AI for EcoLoop India. Inspect these uploaded asset photos with extreme accuracy.\n\n"
             f"EXTRACTED VISIBLE OCR TEXT FROM ALL PHOTOS: \"{combined_ocr}\"\n\n"
-            f"STEP 1: BRAND & MODEL IDENTIFICATION\n"
-            f"- IF OCR TEXT CONTAINS '1+' OR 'OnePlus' OR 'android', THE DEVICE IS DEFINITELY A ONEPLUS SMARTPHONE (e.g. OnePlus 11 5G, OnePlus Nord, OnePlus 9 Pro, OnePlus 10R).\n"
-            f"- IF OCR TEXT CONTAINS 'iPhone' OR APPLE LOGO IS VISIBLE, THE DEVICE IS AN APPLE IPHONE.\n"
-            f"- IF OCR TEXT CONTAINS 'Dell', 'Lenovo', 'HP', 'MacBook', 'ASUS', THE DEVICE IS A LAPTOP.\n"
-            f"- Inspect logos on screen/chassis (OnePlus '1+', Apple logo, Samsung, Dell, HP, Lenovo, ASUS, Xiaomi, Realme, Vivo, Oppo, Google Pixel).\n\n"
-            f"STEP 2: DEFECT ANALYSIS\n"
-            f"- Inspect for screen defects (vertical green/pink line down display, screen static noise/corruption, cracked glass, dead pixels, burnt traces, bent frame).\n\n"
-            f"STEP 3: COMPONENT VALUATION & ECOLOOP INCENTIVES\n"
-            f"- Calculate market value in INR, health score, star rating, physical condition, and brand components:\n"
-            f"  * OnePlus/Android: '120Hz Fluid AMOLED Display', 'Snapdragon / Dimensity Logic Board', 'Warp/SUPERVOOC Battery Pack', 'Hasselblad/Triple Camera Module'.\n"
-            f"  * Laptop: 'FHD/4K IPS Display Panel', 'Intel Core / AMD Ryzen Processor Motherboard', 'Backlit Keyboard & Trackpad Deck', 'High-Capacity Li-ion Battery Pack'.\n\n"
+            f"STEP 1: ACCURATE E-WASTE & ELECTRONICS IDENTIFICATION\n"
+            f"- IF THE IMAGE SHOWS A LIGHT BULB (fused filament bulb, LED bulb, CFL lamp, tube light), identify model_name as 'Fused Filament / LED Light Bulb' or exact brand (e.g. Havells / Wipro / Philips / Crompton), category as 'BULB' or 'E-WASTE BULB', health_score as 15, physical_condition as 'Fused / Burnt Filament', estimated_market_value in INR as 15 to 50 INR scrap floor value.\n"
+            f"- IF THE IMAGE SHOWS A LAPTOP (MacBook, Dell, Lenovo, HP, ASUS, Acer), identify exact model, category as 'LAPTOP'. Inspect for screen defects (flexgate stage-lighting backlight, cracked display, dead pixels).\n"
+            f"- IF THE IMAGE SHOWS A PHONE (iPhone, OnePlus, Samsung, Xiaomi, etc.), identify exact model, category as 'PHONE'.\n"
+            f"- IF THE IMAGE SHOWS CABLES, ADAPTERS, ROUTERS, RAM, SSD, GPU, MOTHERBOARDS, identify accurately.\n\n"
+            f"STEP 2: INDIAN MARKET VALUE & ECOLOOP INCENTIVES\n"
+            f"- Output realistic Indian Rupees (INR) valuation, health score (0-100), and component breakdown.\n\n"
             f"Declared category hint: {preset_category}. CPU-Z / Diagnostics: {json.dumps(diagnostics)}.\n\n"
             f"Return a JSON object with this EXACT structure:\n"
             f"{{\n"
-            f'  "model_name": "<Exact Identified Brand & Model, e.g. OnePlus 11 5G / iPhone XS 64GB / Dell XPS 15 Laptop>",\n'
-            f'  "category": "<PHONE / LAPTOP / RAM / SSD / GPU / MOTHERBOARD>",\n'
-            f'  "estimated_market_value": <integer market value in INR>,\n'
+            f'  "model_name": "<Exact Identified Model, e.g. Fused Filament Light Bulb / Apple MacBook Pro 13-inch / OnePlus 11 5G>",\n'
+            f'  "category": "<BULB / LAPTOP / PHONE / RAM / SSD / GPU / CABLE / ROUTER>",\n'
+            f'  "estimated_market_value": <integer market value in INR, e.g. 35 for bulb, 48500 for damaged laptop, 28000 for phone>,\n'
             f'  "health_score": <integer score 0 to 100>,\n'
             f'  "star_rating": <integer rating 1 to 5>,\n'
-            f'  "physical_condition": "<Screen Static Noise / Green Line Defect / Excellent / Cracked / Damaged>",\n'
+            f'  "physical_condition": "<Fused / Burnt Filament / Stage-Lighting Defect / Excellent / Cracked>",\n'
             f'  "crack_probability_pct": <integer 0 to 100>,\n'
             f'  "scratch_severity": "<None / Minor / Moderate / Severe>",\n'
             f'  "burnt_trace_detected": <boolean true/false>,\n'
-            f'  "ecopoints_earned": <integer 500 for phone, 1000 for laptop, 25 for router, 10 for charger>,\n'
+            f'  "ecopoints_earned": <integer 50 for bulb, 500 for phone, 1000 for laptop>,\n'
             f'  "exchange_bonus_inr": 1500,\n'
-            f'  "greenscore_kg": <float 0.35>,\n'
+            f'  "greenscore_kg": <float 0.15>,\n'
             f'  "kabadiwala_partner": {{\n'
             f'    "partner_uid": "KBD-9402",\n'
             f'    "partner_name": "Verified EcoLoop Partner Ramesh",\n'
@@ -168,44 +169,30 @@ def call_gemini_vision_ai(
             f'    "payout_status": "INSTANT_UPI_READY"\n'
             f'  }},\n'
             f'  "components": [\n'
-            f'    {{"name": "<Component Name>", "status": "<Functional / Damaged>", "value_inr": <integer value in INR>, "health_pct": <integer 0 to 100>}}\n'
+            f'    {{"name": "<Component Name>", "status": "<Functional / Fused / Damaged>", "value_inr": <integer value in INR>, "health_pct": <integer 0 to 100>}}\n'
             f'  ],\n'
             f'  "marketplace_bids": [\n'
-            f'    {{"buyer_name": "<Buyer Name>", "offer_type": "<Refurbish & Resell / Component Harvesting / Material Floor>", "offer_amount": <integer offer in INR>, "badge": "<Highest Offer / Best for Parts / Guaranteed Floor>", "delivery_time": "<24 Hours Pickup / Instant Credit / Drop-off>"}}\n'
+            f'    {{"buyer_name": "<Buyer Name>", "offer_type": "<Refurbish & Resell / Component Harvesting / Material Floor>", "offer_amount": <integer offer in INR>, "badge": "<Highest Offer / Guaranteed Floor>", "delivery_time": "<24 Hours Pickup>"}}\n'
             f'  ]\n'
             f"}}\n"
             f"IMPORTANT: Output ONLY raw valid JSON."
         )
-        parts.append({"text": prompt})
+        contents_parts.append(prompt)
 
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "contents": [{
-                "role": "user",
-                "parts": parts
-            }]
-        }
-
-        req = urllib.request.Request(VERTEX_GEMINI_URL, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-        
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            result_json = json.loads(resp.read().decode("utf-8"))
-            candidates = result_json.get("candidates", [])
-            if candidates and "content" in candidates[0]:
-                parts_resp = candidates[0]["content"].get("parts", [])
-                if parts_resp and "text" in parts_resp[0]:
-                    raw_text = parts_resp[0]["text"].strip()
-                    json_match = re.search(r"\{[\s\S]*\}", raw_text)
-                    if json_match:
-                        parsed_report = json.loads(json_match.group(0))
-                        logger.info(f"Gemini 2.5 Vision AI identified asset: {parsed_report.get('model_name')}")
-                        return parsed_report
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents_parts
+        )
+        if response and response.text:
+            raw_text = response.text.strip()
+            json_match = re.search(r"\{[\s\S]*\}", raw_text)
+            if json_match:
+                parsed_report = json.loads(json_match.group(0))
+                logger.info(f"Gemini 2.5 Flash Vision identified asset: '{parsed_report.get('model_name')}' ({parsed_report.get('category')})")
+                return parsed_report
     except Exception as err:
-        logger.warning(f"Failed executing Gemini 2.5 Vision AI: {err}")
-    
+        logger.warning(f"Gemini 2.5 Flash Vision AI execution notice: {err}")
+
     return None
 
 def run_roboflow_workflow_http(
