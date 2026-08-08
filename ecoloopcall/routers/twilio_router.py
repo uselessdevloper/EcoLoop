@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Form, Response, HTTPException, st
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
-from app import schemas
+from app import models, schemas
 from services import twilio_service, pickup_service, notification_service, sms_service, partner_service
 
 router = APIRouter(
@@ -40,7 +40,7 @@ def voice_response_webhook(
     - Pickup ID (pickup_id)
 
     Logic:
-    - If Digits == 1: Updates pickup status in database to 'Accepted'.
+    - If Digits == 1 or empty: Updates pickup status in database to 'Accepted'.
     - Else: Updates pickup status in database to 'Rejected' AND automatically triggers Twilio SMS fallback.
     """
     target_pickup_id = pickup_id or Pickup_ID or pickup_id_form
@@ -48,21 +48,24 @@ def voice_response_webhook(
     pressed_digit = Digits if Digits is not None else digits_query
     str_digit = str(pressed_digit).strip() if pressed_digit is not None else ""
 
+    print(f"[TWILIO VOICE WEBHOOK] Received voice response. pickup_id: {target_pickup_id}, Digits: '{str_digit}'")
+
     # Evaluate Digits == 1 condition
     if str_digit == "1" or str_digit == "":
         new_status = "Accepted"
     else:
         new_status = "Rejected"
 
-    # Update target pickup or all active pickups
+    # Update target pickup or most recent active pickup
     if target_pickup_id is not None:
         db_pickup = pickup_service.update_pickup_status(db=db, pickup_id=target_pickup_id, new_status=new_status)
     else:
-        pickups = pickup_service.get_pickups(db, limit=100)
-        for p in pickups:
-            if p.status in ["Pending", "Assigned", "Calling"]:
-                pickup_service.update_pickup_status(db=db, pickup_id=p.id, new_status=new_status)
+        pickups = db.query(models.Pickup).order_by(models.Pickup.id.desc()).all()
         db_pickup = None
+        for p in pickups:
+            if (p.status or "").lower() not in ["completed", "cancelled"]:
+                db_pickup = pickup_service.update_pickup_status(db=db, pickup_id=p.id, new_status=new_status)
+                break
 
     # Automatic SMS Fallback if call was Rejected
     if new_status == "Rejected" and db_pickup:
@@ -82,34 +85,81 @@ def voice_response_webhook(
             reason="Rejected by partner via key press"
         )
 
-    twiml_xml = twilio_service.generate_twiml_key_response(digits=str_digit, pickup_id=target_pickup_id or 1)
+    twiml_xml = twilio_service.generate_twiml_key_response(digits=str_digit, pickup_id=target_pickup_id or (db_pickup.id if db_pickup else 1))
     return Response(content=twiml_xml, media_type="application/xml")
 
 
 @router.api_route("/sms-reply", methods=["GET", "POST"], summary="Twilio Incoming SMS Reply Webhook")
 @router.api_route("/twilio/sms-reply", methods=["GET", "POST"], include_in_schema=False)
+@router.api_route("/sms", methods=["GET", "POST"], include_in_schema=False)
+@router.api_route("/twilio/sms", methods=["GET", "POST"], include_in_schema=False)
 def sms_reply_webhook(
     From: Optional[str] = Form(None),
     Body: Optional[str] = Form(None),
+    from_query: Optional[str] = Query(None, alias="From"),
+    body_query: Optional[str] = Query(None, alias="Body"),
+    pickup_id: Optional[int] = Query(None, description="ID of pickup request"),
     db: Session = Depends(get_db)
 ):
     """
-    Receives incoming SMS reply from partner (e.g. 'ACCEPT', '1', 'YES', 'OK').
-    Updates all active pending/assigned pickups to 'Accepted'.
+    Receives incoming SMS reply from partner phone (e.g. 'ACCEPT', '1', 'YES', 'OK').
+    Matches partner phone number or updates most recent active pickup to 'Accepted'.
     Returns TwiML SMS confirmation.
     """
     from twilio.twiml.messaging_response import MessagingResponse
 
     response = MessagingResponse()
-    body_str = (Body or "").strip().upper()
+    raw_body = Body if Body is not None else body_query
+    body_str = (raw_body or "").strip().upper()
 
-    if "ACCEPT" in body_str or body_str == "1" or "YES" in body_str or "OK" in body_str:
-        pickups = pickup_service.get_pickups(db, limit=100)
+    raw_from = From if From is not None else from_query
+    from_str = (raw_from or "").strip()
+
+    print(f"[TWILIO SMS WEBHOOK] Received SMS. From: '{from_str}', Body: '{body_str}', pickup_id: {pickup_id}")
+
+    is_accept = any(keyword in body_str for keyword in ["ACCEPT", "1", "YES", "OK", "CONFIRM", "AGREE"])
+
+    if is_accept:
+        target_pickups = []
+
+        if pickup_id:
+            db_pickup = pickup_service.get_pickup(db, pickup_id)
+            if db_pickup:
+                target_pickups.append(db_pickup)
+        else:
+            # 1. Match partner by phone number if From is present
+            if from_str:
+                clean_phone = from_str.replace(" ", "").replace("-", "")
+                partners = partner_service.get_partners(db, limit=100)
+                matching_partner = None
+                for p in partners:
+                    p_phone_clean = (p.phone or "").replace(" ", "").replace("-", "")
+                    if clean_phone and (clean_phone == p_phone_clean or clean_phone.endswith(p_phone_clean[-10:])):
+                        matching_partner = p
+                        break
+                
+                if matching_partner:
+                    partner_pickups = db.query(models.Pickup).filter(
+                        models.Pickup.assigned_partner == matching_partner.id
+                    ).order_by(models.Pickup.id.desc()).all()
+
+                    for p in partner_pickups:
+                        if (p.status or "").lower() not in ["completed", "cancelled"]:
+                            target_pickups.append(p)
+
+            # 2. Fallback: Update most recent active non-completed pickup
+            if not target_pickups:
+                all_pickups = db.query(models.Pickup).order_by(models.Pickup.id.desc()).all()
+                for p in all_pickups:
+                    if (p.status or "").lower() not in ["completed", "cancelled"]:
+                        target_pickups.append(p)
+                        break
+
         updated_count = 0
-        for p in pickups:
-            if p.status in ["Pending", "Assigned", "Calling"]:
-                pickup_service.update_pickup_status(db=db, pickup_id=p.id, new_status="Accepted")
-                updated_count += 1
+        for p in target_pickups:
+            pickup_service.update_pickup_status(db=db, pickup_id=p.id, new_status="Accepted")
+            updated_count += 1
+            print(f"[TWILIO SMS WEBHOOK] Successfully updated Pickup #{p.id} status to 'Accepted'")
 
         response.message("[EcoLoop] Pickup confirmed! Thank you for accepting.")
     else:

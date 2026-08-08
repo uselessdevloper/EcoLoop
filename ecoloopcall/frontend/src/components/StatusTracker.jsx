@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Search, PhoneCall, CheckCircle2, RefreshCw, UserCheck, ShieldAlert, ArrowLeft, Bike, Award, Check } from 'lucide-react';
+import { Search, PhoneCall, CheckCircle2, RefreshCw, UserCheck, ShieldAlert, ArrowLeft, Bike, Award, Check, XCircle, MessageSquare, Send, RotateCcw } from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -9,7 +9,8 @@ export default function StatusTracker({ pickupId, onReset }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastPolled, setLastPolled] = useState(new Date());
-  const [isSimulatingAccept, setIsSimulatingAccept] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null); // 'accept', 'reject', 'sms', 'redispatch'
+  const [actionMessage, setActionMessage] = useState('');
 
   // Function to fetch pickup status via Axios
   const fetchPickupStatus = async () => {
@@ -37,27 +38,88 @@ export default function StatusTracker({ pickupId, onReset }) {
     return () => clearInterval(interval);
   }, [pickupId]);
 
-  // Simulate Press 1 (Partner Accept) via Axios call to Webhook
+  // Simulate Press 1 (Partner Accept Call)
   const handleSimulateAccept = async () => {
-    setIsSimulatingAccept(true);
+    setActionLoading('accept');
+    setActionMessage('');
     try {
-      await axios.post(`${API_BASE_URL}/voice-response?pickup_id=${pickupId}`, 'Digits=1', {
+      const params = new URLSearchParams();
+      params.append('Digits', '1');
+      await axios.post(`${API_BASE_URL}/voice-response?pickup_id=${pickupId}`, params, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
+      setActionMessage('✓ Partner Call Accepted! Status updated to Accepted.');
       await fetchPickupStatus();
     } catch (err) {
       console.error("Simulate accept error:", err);
+      setActionMessage('Failed to trigger call accept simulation.');
     } finally {
-      setIsSimulatingAccept(false);
+      setActionLoading(null);
     }
   };
 
-  const currentStatus = pickupData?.status || 'Pending';
+  // Simulate Press 2 (Partner Reject Call -> Trigger SMS Fallback)
+  const handleSimulateReject = async () => {
+    setActionLoading('reject');
+    setActionMessage('');
+    try {
+      const params = new URLSearchParams();
+      params.append('Digits', '2');
+      await axios.post(`${API_BASE_URL}/voice-response?pickup_id=${pickupId}`, params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      setActionMessage('⚠️ Partner Call Rejected. Automatic SMS Fallback triggered!');
+      await fetchPickupStatus();
+    } catch (err) {
+      console.error("Simulate reject error:", err);
+      setActionMessage('Failed to trigger call reject simulation.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-  const isStep1Active = currentStatus === 'Pending' || currentStatus === 'Searching';
-  const isStep2Active = currentStatus === 'Assigned' || currentStatus === 'Calling' || currentStatus === 'In Transit';
-  const isStep3Active = currentStatus === 'Accepted' || currentStatus === 'Completed';
-  const isRejected = currentStatus === 'Rejected' || currentStatus === 'Cancelled';
+  // Simulate Partner Replying SMS "ACCEPT"
+  const handleSimulateSmsAccept = async () => {
+    setActionLoading('sms');
+    setActionMessage('');
+    try {
+      const params = new URLSearchParams();
+      params.append('Body', 'ACCEPT');
+      await axios.post(`${API_BASE_URL}/sms-reply?pickup_id=${pickupId}`, params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      setActionMessage('✓ SMS Reply "ACCEPT" processed! Status updated to Accepted.');
+      await fetchPickupStatus();
+    } catch (err) {
+      console.error("Simulate SMS accept error:", err);
+      setActionMessage('Failed to process SMS reply.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Message / Dispatch Again (Re-dispatch Call & SMS)
+  const handleMessageAgain = async () => {
+    setActionLoading('redispatch');
+    setActionMessage('');
+    try {
+      const res = await axios.post(`${API_BASE_URL}/pickup/${pickupId}/dispatch`);
+      setActionMessage(`📲 Re-dispatched pickup! Voice call & SMS re-sent to ${res.data.matched_partner?.name || 'partner'}.`);
+      await fetchPickupStatus();
+    } catch (err) {
+      console.error("Message again / re-dispatch error:", err);
+      setActionMessage('Failed to re-dispatch call & message.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const statusLower = (pickupData?.status || 'pending').toLowerCase();
+
+  const isStep1Active = statusLower === 'pending' || statusLower === 'searching';
+  const isStep2Active = statusLower === 'assigned' || statusLower === 'calling' || statusLower === 'in transit' || statusLower === 'in_transit';
+  const isStep3Active = statusLower === 'accepted' || statusLower === 'completed';
+  const isRejected = statusLower === 'rejected' || statusLower === 'cancelled';
 
   const getStepStatus = (stepIndex) => {
     if (isRejected) return stepIndex === 3 ? 'rejected' : 'done';
@@ -161,18 +223,65 @@ export default function StatusTracker({ pickupId, onReset }) {
         </div>
       </div>
 
-      {/* Manual Accept Simulation Button for Step 2 */}
-      {!isStep3Active && !isRejected && (
-        <button
-          type="button"
-          onClick={handleSimulateAccept}
-          disabled={isSimulatingAccept}
-          className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition"
-        >
-          <Check className="w-4 h-4" />
-          <span>{isSimulatingAccept ? 'Confirming...' : 'Simulate Partner Accepting Call (Press 1)'}</span>
-        </button>
+      {/* Action Feedback Banner */}
+      {actionMessage && (
+        <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs font-medium text-center">
+          {actionMessage}
+        </div>
       )}
+
+      {/* Interactive Simulation & Control Buttons */}
+      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+          Twilio Dispatch Actions & Testing Controls
+        </span>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+          {/* Accept Call Action */}
+          <button
+            type="button"
+            onClick={handleSimulateAccept}
+            disabled={actionLoading !== null || isStep3Active}
+            className="py-3 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40 border border-emerald-500/40 text-emerald-400 rounded-xl flex items-center justify-center space-x-2 transition"
+          >
+            <Check className="w-4 h-4" />
+            <span>{actionLoading === 'accept' ? 'Accepting...' : 'Accept Call (Press 1)'}</span>
+          </button>
+
+          {/* Reject Call Action */}
+          <button
+            type="button"
+            onClick={handleSimulateReject}
+            disabled={actionLoading !== null || isStep3Active}
+            className="py-3 px-4 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-40 border border-red-500/40 text-red-400 rounded-xl flex items-center justify-center space-x-2 transition"
+          >
+            <XCircle className="w-4 h-4" />
+            <span>{actionLoading === 'reject' ? 'Rejecting...' : 'Reject Call (Press 2)'}</span>
+          </button>
+
+          {/* SMS Accept Action */}
+          <button
+            type="button"
+            onClick={handleSimulateSmsAccept}
+            disabled={actionLoading !== null || isStep3Active}
+            className="py-3 px-4 bg-cyan-500/10 hover:bg-cyan-500/20 disabled:opacity-40 border border-cyan-500/40 text-cyan-400 rounded-xl flex items-center justify-center space-x-2 transition"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>{actionLoading === 'sms' ? 'Replying SMS...' : 'Accept via SMS ("ACCEPT")'}</span>
+          </button>
+
+          {/* Message / Dispatch Again Action */}
+          <button
+            type="button"
+            onClick={handleMessageAgain}
+            disabled={actionLoading !== null}
+            className="py-3 px-4 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 border border-amber-500/40 text-amber-400 rounded-xl flex items-center justify-center space-x-2 transition"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>{actionLoading === 'redispatch' ? 'Sending...' : 'Message & Call Again'}</span>
+          </button>
+        </div>
+      </div>
 
       {/* Details Box */}
       {pickupData && (
@@ -242,3 +351,4 @@ export default function StatusTracker({ pickupId, onReset }) {
     </div>
   );
 }
+
