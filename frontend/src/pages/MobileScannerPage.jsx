@@ -657,7 +657,13 @@ export default function MobileScannerPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] text-slate-500 font-mono block">HEALTH SCORE</span>
-                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-700 font-mono font-black text-sm">
+                        <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-mono font-black text-sm border ${
+                          reportData.health_score >= 80 
+                            ? "bg-emerald-100 border-emerald-300 text-emerald-700" 
+                            : reportData.health_score >= 50 
+                              ? "bg-amber-100 border-amber-300 text-amber-700" 
+                              : "bg-rose-100 border-rose-300 text-rose-700"
+                        }`}>
                           <ShieldCheck size={16} /> {reportData.health_score}/100
                         </div>
                       </div>
