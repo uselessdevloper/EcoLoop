@@ -51,9 +51,11 @@ def get_gcloud_token() -> Optional[str]:
     return None
 
 def compress_image_for_ai(image_bytes: bytes) -> tuple[bytes, str]:
-    """Resizes image to max 1024x1024 and converts to JPEG for fast, sub-second Gemini Vision AI API execution."""
+    """Resizes image to max 1024x1024 and converts to JPEG for fast, sub-second Vision AI API execution."""
     try:
         pil_img = Image.open(io.BytesIO(image_bytes))
+        if pil_img.mode in ("RGBA", "P", "LA"):
+            pil_img = pil_img.convert("RGB")
         pil_img.thumbnail((1024, 1024))
         buf = io.BytesIO()
         pil_img.save(buf, format="JPEG", quality=85)
@@ -108,90 +110,170 @@ def call_gemini_vision_ai(
     diagnostics: Dict[str, Any] = {}
 ) -> Optional[Dict[str, Any]]:
     """
-    Calls Gemini 2.5 Flash Vision model on Vertex AI using gcloud CLI authentication token.
-    Provides real multimodal computer vision analysis of any uploaded electronic asset or e-waste item.
+    Calls Vision AI model for real-time asset identification.
+    Uses fallback chain: Direct Gemini API -> OpenRouter API -> NVIDIA NIM API.
     """
-    token = get_gcloud_token()
-    if not token:
-        return None
+    import os
+    import requests
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    nvidia_key = os.getenv("NVIDIA_NIM_API_KEY")
 
-    try:
-        from google import genai
-        from google.genai import types
-        from google.oauth2.credentials import Credentials
+    all_ocr_texts = []
+    for idx, img_bytes in enumerate(images):
+        ocr_text = extract_ocr_text_from_image(img_bytes)
+        if ocr_text:
+            all_ocr_texts.append(f"Image {idx+1}: {ocr_text}")
+    combined_ocr = " | ".join(all_ocr_texts)
 
-        creds = Credentials(token)
-        client = genai.Client(credentials=creds, vertexai=True, project="waskpilotai", location="us-central1")
+    prompt = (
+        f"You are the master hardware quality & e-waste inspection AI for EcoLoop India. Inspect these uploaded asset photos with extreme accuracy.\n\n"
+        f"EXTRACTED VISIBLE OCR TEXT FROM ALL PHOTOS: \"{combined_ocr}\"\n\n"
+        f"STEP 1: ACCURATE E-WASTE & ELECTRONICS IDENTIFICATION\n"
+        f"- IF THE IMAGE SHOWS A LIGHT BULB (fused filament bulb, LED bulb, CFL lamp, tube light), identify model_name as 'Fused Filament / LED Light Bulb' or exact brand (e.g. Havells / Wipro / Philips / Crompton), category as 'BULB' or 'E-WASTE BULB', health_score as 15, physical_condition as 'Fused / Burnt Filament', estimated_market_value in INR as 15 to 50 INR scrap floor value.\n"
+        f"- IF THE IMAGE SHOWS A LAPTOP (MacBook, Dell, Lenovo, HP, ASUS, Acer), identify exact model, category as 'LAPTOP'. Inspect for screen defects (flexgate stage-lighting backlight, cracked display, dead pixels).\n"
+        f"- IF THE IMAGE SHOWS A PHONE (iPhone, OnePlus, Samsung, Xiaomi, etc.), identify exact model, category as 'PHONE'.\n"
+        f"- IF THE IMAGE SHOWS CABLES, ADAPTERS, CHARGERS, ROUTERS, RAM, SSD, GPU, MOTHERBOARDS, identify accurately.\n\n"
+        f"STEP 2: INDIAN MARKET VALUE & ECOLOOP INCENTIVES\n"
+        f"- Output realistic Indian Rupees (INR) valuation, health score (0-100), and component breakdown.\n\n"
+        f"Declared category hint: {preset_category}. CPU-Z / Diagnostics: {json.dumps(diagnostics)}.\n\n"
+        f"Return a JSON object with this EXACT structure:\n"
+        f"{{\n"
+        f'  "model_name": "<Exact Identified Model, e.g. Apple Lightning Cable / Fused Filament Light Bulb / OnePlus 11 5G>",\n'
+        f'  "category": "<CHARGER / BULB / LAPTOP / PHONE / RAM / SSD / GPU / CABLE / ROUTER>",\n'
+        f'  "estimated_market_value": <integer market value in INR, e.g. 150 for cable, 35 for bulb, 28000 for phone>,\n'
+        f'  "health_score": <integer score 0 to 100>,\n'
+        f'  "star_rating": <integer rating 1 to 5>,\n'
+        f'  "physical_condition": "<Broken / Frayed Wires / Fused / Burnt Filament / Excellent / Cracked>",\n'
+        f'  "crack_probability_pct": <integer 0 to 100>,\n'
+        f'  "scratch_severity": "<None / Minor / Moderate / Severe>",\n'
+        f'  "burnt_trace_detected": <boolean true/false>,\n'
+        f'  "ecopoints_earned": <integer 50 for bulb, 500 for phone, 1000 for laptop>,\n'
+        f'  "exchange_bonus_inr": 1500,\n'
+        f'  "greenscore_kg": <float 0.15>,\n'
+        f'  "kabadiwala_partner": {{\n'
+        f'    "partner_uid": "KBD-9402",\n'
+        f'    "partner_name": "Verified EcoLoop Partner Ramesh",\n'
+        f'    "commission_inr": 250,\n'
+        f'    "payout_status": "INSTANT_UPI_READY"\n'
+        f'  }},\n'
+        f'  "components": [\n'
+        f'    {{"name": "<Component Name>", "status": "<Functional / Fused / Damaged>", "value_inr": <integer value in INR>, "health_pct": <integer 0 to 100>}}\n'
+        f'  ],\n'
+        f'  "marketplace_bids": [\n'
+        f'    {{"buyer_name": "<Buyer Name>", "offer_type": "<Refurbish & Resell / Component Harvesting / Material Floor>", "offer_amount": <integer offer in INR>, "badge": "<Highest Offer / Guaranteed Floor>", "delivery_time": "<24 Hours Pickup>"}}\n'
+        f'  ]\n'
+        f"}}\n"
+        f"IMPORTANT: Output ONLY raw valid JSON."
+    )
 
-        contents_parts = []
-        all_ocr_texts = []
+    # 1. Try Direct Google Gemini API if key exists
+    if gemini_key:
+        try:
+            logger.info("Attempting Vision AI via Direct Google Gemini API...")
+            parts = [{"text": prompt}]
+            for img_bytes in images:
+                compressed_bytes, mime_type = compress_image_for_ai(img_bytes)
+                b64_img = base64.b64encode(compressed_bytes).decode("utf-8")
+                parts.append({
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": b64_img
+                    }
+                })
 
-        for idx, img_bytes in enumerate(images):
-            compressed_bytes, mime_type = compress_image_for_ai(img_bytes)
-            contents_parts.append(types.Part.from_bytes(data=compressed_bytes, mime_type=mime_type))
-            
-            ocr_text = extract_ocr_text_from_image(img_bytes)
-            if ocr_text:
-                all_ocr_texts.append(f"Image {idx+1}: {ocr_text}")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+            payload = {
+                "contents": [{"parts": parts}],
+                "generationConfig": {"response_mime_type": "application/json"}
+            }
+            resp = requests.post(url, json=payload, timeout=25)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                json_match = re.search(r"\{[\s\S]*\}", raw_text)
+                if json_match:
+                    logger.info("Direct Gemini API successful.")
+                    return json.loads(json_match.group(0))
+            else:
+                logger.warning(f"Direct Gemini API error: {resp.status_code} - {resp.text}")
+        except Exception as e:
+            logger.warning(f"Direct Gemini API exception: {e}")
 
-        combined_ocr = " | ".join(all_ocr_texts)
-        logger.info(f"Combined OCR text tokens: '{combined_ocr}'")
+    # 2. Try OpenRouter API if key exists
+    if openrouter_key:
+        try:
+            logger.info("Attempting Vision AI via OpenRouter API...")
+            image_contents = []
+            for img_bytes in images:
+                compressed_bytes, mime_type = compress_image_for_ai(img_bytes)
+                b64_img = base64.b64encode(compressed_bytes).decode("utf-8")
+                image_contents.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{b64_img}"}
+                })
 
-        prompt = (
-            f"You are the master hardware quality & e-waste inspection AI for EcoLoop India. Inspect these uploaded asset photos with extreme accuracy.\n\n"
-            f"EXTRACTED VISIBLE OCR TEXT FROM ALL PHOTOS: \"{combined_ocr}\"\n\n"
-            f"STEP 1: ACCURATE E-WASTE & ELECTRONICS IDENTIFICATION\n"
-            f"- IF THE IMAGE SHOWS A LIGHT BULB (fused filament bulb, LED bulb, CFL lamp, tube light), identify model_name as 'Fused Filament / LED Light Bulb' or exact brand (e.g. Havells / Wipro / Philips / Crompton), category as 'BULB' or 'E-WASTE BULB', health_score as 15, physical_condition as 'Fused / Burnt Filament', estimated_market_value in INR as 15 to 50 INR scrap floor value.\n"
-            f"- IF THE IMAGE SHOWS A LAPTOP (MacBook, Dell, Lenovo, HP, ASUS, Acer), identify exact model, category as 'LAPTOP'. Inspect for screen defects (flexgate stage-lighting backlight, cracked display, dead pixels).\n"
-            f"- IF THE IMAGE SHOWS A PHONE (iPhone, OnePlus, Samsung, Xiaomi, etc.), identify exact model, category as 'PHONE'.\n"
-            f"- IF THE IMAGE SHOWS CABLES, ADAPTERS, ROUTERS, RAM, SSD, GPU, MOTHERBOARDS, identify accurately.\n\n"
-            f"STEP 2: INDIAN MARKET VALUE & ECOLOOP INCENTIVES\n"
-            f"- Output realistic Indian Rupees (INR) valuation, health score (0-100), and component breakdown.\n\n"
-            f"Declared category hint: {preset_category}. CPU-Z / Diagnostics: {json.dumps(diagnostics)}.\n\n"
-            f"Return a JSON object with this EXACT structure:\n"
-            f"{{\n"
-            f'  "model_name": "<Exact Identified Model, e.g. Fused Filament Light Bulb / Apple MacBook Pro 13-inch / OnePlus 11 5G>",\n'
-            f'  "category": "<BULB / LAPTOP / PHONE / RAM / SSD / GPU / CABLE / ROUTER>",\n'
-            f'  "estimated_market_value": <integer market value in INR, e.g. 35 for bulb, 48500 for damaged laptop, 28000 for phone>,\n'
-            f'  "health_score": <integer score 0 to 100>,\n'
-            f'  "star_rating": <integer rating 1 to 5>,\n'
-            f'  "physical_condition": "<Fused / Burnt Filament / Stage-Lighting Defect / Excellent / Cracked>",\n'
-            f'  "crack_probability_pct": <integer 0 to 100>,\n'
-            f'  "scratch_severity": "<None / Minor / Moderate / Severe>",\n'
-            f'  "burnt_trace_detected": <boolean true/false>,\n'
-            f'  "ecopoints_earned": <integer 50 for bulb, 500 for phone, 1000 for laptop>,\n'
-            f'  "exchange_bonus_inr": 1500,\n'
-            f'  "greenscore_kg": <float 0.15>,\n'
-            f'  "kabadiwala_partner": {{\n'
-            f'    "partner_uid": "KBD-9402",\n'
-            f'    "partner_name": "Verified EcoLoop Partner Ramesh",\n'
-            f'    "commission_inr": 250,\n'
-            f'    "payout_status": "INSTANT_UPI_READY"\n'
-            f'  }},\n'
-            f'  "components": [\n'
-            f'    {{"name": "<Component Name>", "status": "<Functional / Fused / Damaged>", "value_inr": <integer value in INR>, "health_pct": <integer 0 to 100>}}\n'
-            f'  ],\n'
-            f'  "marketplace_bids": [\n'
-            f'    {{"buyer_name": "<Buyer Name>", "offer_type": "<Refurbish & Resell / Component Harvesting / Material Floor>", "offer_amount": <integer offer in INR>, "badge": "<Highest Offer / Guaranteed Floor>", "delivery_time": "<24 Hours Pickup>"}}\n'
-            f'  ]\n'
-            f"}}\n"
-            f"IMPORTANT: Output ONLY raw valid JSON."
-        )
-        contents_parts.append(prompt)
+            messages = [{"role": "user", "content": [{"type": "text", "text": prompt}, *image_contents]}]
+            payload = {
+                "model": "google/gemini-2.5-flash",
+                "messages": messages,
+                "max_tokens": 1024,
+                "response_format": {"type": "json_object"}
+            }
+            headers = {
+                "Authorization": f"Bearer {openrouter_key}",
+                "HTTP-Referer": "https://ecoloop.in",
+                "X-Title": "EcoLoop Vision"
+            }
+            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=25)
+            if resp.status_code == 200:
+                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+                json_match = re.search(r"\{[\s\S]*\}", raw_text)
+                if json_match:
+                    logger.info("OpenRouter API successful.")
+                    return json.loads(json_match.group(0))
+            else:
+                logger.warning(f"OpenRouter API error: {resp.status_code} - {resp.text}")
+        except Exception as e:
+            logger.warning(f"OpenRouter API exception: {e}")
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents_parts
-        )
-        if response and response.text:
-            raw_text = response.text.strip()
-            json_match = re.search(r"\{[\s\S]*\}", raw_text)
-            if json_match:
-                parsed_report = json.loads(json_match.group(0))
-                logger.info(f"Gemini 2.5 Flash Vision identified asset: '{parsed_report.get('model_name')}' ({parsed_report.get('category')})")
-                return parsed_report
-    except Exception as err:
-        logger.warning(f"Gemini 2.5 Flash Vision AI execution notice: {err}")
+    # 3. Try NVIDIA NIM API if key exists
+    if nvidia_key:
+        try:
+            logger.info("Attempting Vision AI via NVIDIA NIM API...")
+            image_contents = []
+            for img_bytes in images:
+                compressed_bytes, mime_type = compress_image_for_ai(img_bytes)
+                b64_img = base64.b64encode(compressed_bytes).decode("utf-8")
+                image_contents.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{b64_img}"}
+                })
+
+            messages = [{"role": "user", "content": [{"type": "text", "text": prompt}, *image_contents]}]
+            payload = {
+                "model": os.getenv("NVIDIA_VISION_MODEL", "meta/llama-3.2-11b-vision-instruct"),
+                "messages": messages,
+                "max_tokens": 1024
+            }
+            headers = {
+                "Authorization": f"Bearer {nvidia_key}",
+                "Content-Type": "application/json"
+            }
+            resp = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", json=payload, headers=headers, timeout=25)
+            if resp.status_code == 200:
+                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+                json_match = re.search(r"\{[\s\S]*\}", raw_text)
+                if json_match:
+                    logger.info("NVIDIA NIM API successful.")
+                    return json.loads(json_match.group(0))
+            else:
+                logger.warning(f"NVIDIA NIM API error: {resp.status_code} - {resp.text}")
+        except Exception as e:
+            logger.warning(f"NVIDIA NIM API exception: {e}")
 
     return None
 
@@ -504,6 +586,15 @@ def generate_device_intelligence_report(
             {"name": "Case Shell & Hinge", "status": f"{scratch_sev} Wear", "value_inr": case_val, "health_pct": 95 if scratch_sev == "Minor" else 55}
         ]
 
+    elif category in ["charger", "cable"]:
+        model_name = "Apple Lightning Cable"
+        base_market_val = 200
+        components = [
+            {"name": "USB Connector", "status": "Functional", "value_inr": 100, "health_pct": 80},
+            {"name": "Cable Wire", "status": "Frayed/Torn" if crack_prob > 0.5 else "Intact", "value_inr": 0 if crack_prob > 0.5 else 50, "health_pct": 10 if crack_prob > 0.5 else 90},
+            {"name": "Lightning Connector", "status": "Corroded/Damaged" if burnt_trace else "Functional", "value_inr": 50, "health_pct": 30 if burnt_trace else 90}
+        ]
+
     else: # Motherboard / General
         model_name = "Dell Latitude Dual-Channel OEM Motherboard"
         base_market_val = 14500
@@ -686,6 +777,10 @@ async def evaluate_device(
             elif any(w in ocr_text for w in ["ssd", "nvme", "nand", "samsung", "wd_black"]):
                 vision_results["category"] = "ssd"
                 category = "ssd"
+                break
+            elif any(w in ocr_text for w in ["charger", "cable", "lightning", "usb", "adapter", "power"]):
+                vision_results["category"] = "charger"
+                category = "charger"
                 break
             elif any(w in ocr_text for w in ["rtx", "geforce", "nvidia", "radeon", "gpu"]):
                 vision_results["category"] = "gpu"

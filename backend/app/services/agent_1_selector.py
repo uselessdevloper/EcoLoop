@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 VALID_COMMODITIES = {
     "motherboard", "label", "microchip", "processor", "ram",
-    "storage", "gpu", "battery", "display", "chassis", "fan", "sensor", "other"
+    "storage", "gpu", "battery", "display", "chassis", "fan", "sensor", "charger", "cable", "other"
 }
 
 
@@ -118,6 +118,7 @@ def classify_part_commodity(image_path: str) -> str:
                 "ram": ["ddr", "ram", "memory", "dimm"],
                 "storage": ["ssd", "nvme", "sata", "hdd"],
                 "microchip": ["chip", "ic", "microchip", "controller"],
+                "charger": ["charger", "cable", "lightning", "usb", "power", "adapter"],
             }
             for commodity, keywords in keyword_map.items():
                 if any(k in text for k in keywords):

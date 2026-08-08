@@ -163,6 +163,7 @@ def seed():
             if "ssd" in lower or "hdd" in lower or "drive" in lower: return "storage"
             if "label" in lower or "warranty" in lower or "seal" in lower: return "label"
             if "gpu" in lower or "sound" in lower or "card" in lower: return "gpu"
+            if "charger" in lower or "cable" in lower: return "charger"
             return "motherboard"
 
         def get_part_number_from_filename(fname: str) -> str:

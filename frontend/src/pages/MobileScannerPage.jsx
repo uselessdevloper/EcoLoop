@@ -52,6 +52,7 @@ const PRESET_OPTIONS = [
   { id: "ssd", label: "SSD", icon: HardDrive },
   { id: "gpu", label: "GPU", icon: Monitor },
   { id: "motherboard", label: "Motherboard", icon: Layers },
+  { id: "charger", label: "Charger/Cable", icon: Zap },
 ];
 
 export default function MobileScannerPage() {
@@ -1494,6 +1495,31 @@ function generateLocalFallbackReport(category = "auto", diagnostics = {}) {
       ],
       marketplace_bids: [
         { buyer_name: "Silicon Harvest Spares Hub", offer_type: "Direct Purchase", offer_amount: 6900, badge: "Highest Offer", delivery_time: "Instant Credit" }
+      ]
+    };
+  }
+
+  if (cat === "charger" || cat === "cable") {
+    return {
+      model_name: "Apple Lightning Cable",
+      category: "CHARGER",
+      estimated_market_value: 150,
+      health_score: 15,
+      star_rating: 1,
+      physical_condition: "Broken / Frayed Wires",
+      crack_probability_pct: 90,
+      scratch_severity: "Severe",
+      burnt_trace_detected: true,
+      ecopoints_earned: 50,
+      exchange_bonus_inr: 100,
+      greenscore_kg: 0.05,
+      components: [
+        { name: "USB Connector", status: "Functional", value_inr: 100, health_pct: 80 },
+        { name: "Cable Wire", status: "Frayed/Torn", value_inr: 0, health_pct: 5 },
+        { name: "Lightning Connector", status: "Corroded/Damaged", value_inr: 50, health_pct: 20 }
+      ],
+      marketplace_bids: [
+        { buyer_name: "EcoRecycle Green Metals", offer_type: "Material Recycling", offer_amount: 50, badge: "Guaranteed Floor", delivery_time: "Drop-off" }
       ]
     };
   }
