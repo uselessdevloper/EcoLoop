@@ -4,7 +4,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/DELL-FutureMind_AI_Hackathon-0076CE?style=for-the-badge&logo=dell&logoColor=white" alt="Dell FutureMind" />
-  <img src="https://img.shields.io/badge/Team-IDEAFORG--E-8B5CF6?style=for-the-badge" alt="Team IdeaForg-e" />
+  <img src="https://img.shields.io/badge/Team-24x7-8B5CF6?style=for-the-badge" alt="Team 24x7" />
   <img src="https://img.shields.io/badge/Document-Agents_&_Workflow_Deep_Dive-00C853?style=for-the-badge" alt="Deep Dive Document" />
 </p>
 
@@ -393,5 +393,5 @@ To ensure FastAPI starts listening on port 8000 in under **200ms** without block
 
 <p align="center">
   <strong>VeriVision AI — Built for the Dell FutureMind AI Hackathon Grand Final 2026</strong><br>
-  <em>Team IDEAFORG-E: Disha · Anil · Priyanka · Chaitanya · Jagruti</em>
+  <em>Team 24x7: Utkar Sinha · Mishkan Gupta · Somya Sagar Naik · Abhijit Chaudhary · Subham Sadangi</em>
 </p>

@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/EcoLoop-E--Waste_Circular_Network-3D74B6?style=for-the-badge&logo=recycle&logoColor=FEFFC4" alt="EcoLoop" />
   <img src="https://img.shields.io/badge/VeriVision_AI-5--Agent_Vision_Pipeline-059669?style=for-the-badge" alt="VeriVision AI" />
-  <img src="https://img.shields.io/badge/Team-IDEAFORG--E-8B5CF6?style=for-the-badge" alt="Team IdeaForg-e" />
+  <img src="https://img.shields.io/badge/Team-24x7-8B5CF6?style=for-the-badge" alt="Team 24x7" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License" />
 </p>
 
@@ -48,7 +48,8 @@
 16. [Testing](#-testing)
 17. [Docker Deployment](#-docker-deployment)
 18. [Troubleshooting](#-troubleshooting)
-19. [License & Credits](#-license--credits)
+19. [Team](#-team)
+20. [License & Credits](#-license--credits)
 
 ---
 
@@ -900,6 +901,18 @@ For persistence across restarts, mount volumes for `/app/backend/data` and the S
 
 ---
 
+## 👥 Team
+
+**Team 24x7** — built for the Dell FutureMind AI Hackathon Grand Final 2026.
+
+- **Utkar Sinha**
+- **Mishkan Gupta**
+- **Somya Sagar Naik**
+- **Abhijit Chaudhary**
+- **Subham Sadangi**
+
+---
+
 ## 📜 License & Credits
 
 Released under the **MIT License** — see [LICENSE.md](LICENSE.md).
@@ -909,6 +922,6 @@ Further technical depth on the agents, RBAC personas, demo walkthrough, and repo
 <p align="center">
   <strong>EcoLoop · VeriVision AI</strong><br />
   <em>Built for the Dell FutureMind AI Hackathon Grand Final 2026</em><br /><br />
-  <strong>Team IDEAFORG-E</strong><br />
-  Disha · Anil · Priyanka · Chaitanya · Jagruti
+  <strong>Team 24x7</strong><br />
+  Utkar Sinha · Mishkan Gupta · Somya Sagar Naik · Abhijit Chaudhary · Subham Sadangi
 </p>
