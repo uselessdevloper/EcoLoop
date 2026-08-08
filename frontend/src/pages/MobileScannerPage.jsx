@@ -35,7 +35,10 @@ import {
   Headphones,
   Terminal,
   Tag,
-  Gift
+  Gift,
+  Home,
+  History,
+  Scan
 } from "lucide-react";
 import { evaluateDeviceScan } from "../services/evaluationService.js";
 import { runCpuzHardwareDiagnostic } from "../services/cpuzService.js";
@@ -348,12 +351,14 @@ export default function MobileScannerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased flex flex-col items-center justify-start p-2 sm:p-6">
-      {/* MOBILE APPLICATION CONTAINER FRAME (White & Purple Theme) */}
-      <div className="w-full max-w-[430px] bg-white border border-purple-200 rounded-[38px] shadow-2xl overflow-hidden flex flex-col min-h-[780px] relative">
-        {/* Mobile Status Bar */}
-        <div className="bg-[#7C3AED] text-white px-6 py-2 flex justify-between items-center text-[11px] font-mono font-bold">
+    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans antialiased flex flex-col items-center justify-center p-2 sm:p-4">
+      {/* MOBILE APPLICATION CONTAINER FRAME (Android / iPhone Smartphone Frame) */}
+      <div className="w-full max-w-[410px] bg-white border-[8px] border-slate-900 rounded-[48px] shadow-2xl overflow-hidden flex flex-col h-[850px] max-h-[96vh] relative ring-1 ring-slate-800">
+        {/* Dynamic Island Notch & Mobile Status Bar */}
+        <div className="bg-[#7C3AED] text-white px-6 pt-2 pb-1 flex justify-between items-center text-[10px] font-mono font-bold relative shrink-0">
           <span>9:41</span>
+          {/* Top Notch / Dynamic Island */}
+          <div className="w-20 h-3 bg-slate-900 rounded-full absolute left-1/2 -translate-x-1/2 top-1" />
           <span className="flex items-center gap-1.5">
             <span>5G</span>
             <span>⚡ 100%</span>
@@ -1046,6 +1051,60 @@ export default function MobileScannerPage() {
             </div>
           )}
         </main>
+
+        {/* FIXED BOTTOM NAVIGATION BAR (Home, History, Scan, Rewards, Profile) */}
+        <nav className="bg-white border-t border-purple-200 px-3 py-1.5 flex justify-around items-center shrink-0 z-20 shadow-md">
+          <button 
+            onClick={() => setActivePersona("consumer")}
+            className={`flex flex-col items-center gap-0.5 transition ${activePersona === "consumer" ? "text-[#7C3AED]" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <div className={`p-1 rounded-xl ${activePersona === "consumer" ? "bg-[#F3E8FF]" : ""}`}>
+              <Home size={18} />
+            </div>
+            <span className="text-[9px] font-mono font-bold">Home</span>
+          </button>
+
+          <button 
+            onClick={() => setActivePersona("partner")}
+            className={`flex flex-col items-center gap-0.5 transition ${activePersona === "partner" ? "text-[#7C3AED]" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <div className={`p-1 rounded-xl ${activePersona === "partner" ? "bg-[#F3E8FF]" : ""}`}>
+              <History size={18} />
+            </div>
+            <span className="text-[9px] font-mono font-bold">History</span>
+          </button>
+
+          {/* Central Floating Scan Action Button */}
+          <button 
+            onClick={resetScanner}
+            className="flex flex-col items-center justify-center -mt-4 transition transform active:scale-95"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-[#7C3AED] text-white flex items-center justify-center shadow-lg border-2 border-white">
+              <Scan size={20} />
+            </div>
+            <span className="text-[9px] font-mono font-black text-[#7C3AED] mt-0.5">Scan</span>
+          </button>
+
+          <button 
+            onClick={() => setShowRewardsModal(true)}
+            className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-600 transition"
+          >
+            <div className="p-1 rounded-xl">
+              <Gift size={18} />
+            </div>
+            <span className="text-[9px] font-mono font-bold">Rewards</span>
+          </button>
+
+          <button 
+            onClick={() => setActivePersona("admin")}
+            className={`flex flex-col items-center gap-0.5 transition ${activePersona === "admin" ? "text-[#7C3AED]" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <div className={`p-1 rounded-xl ${activePersona === "admin" ? "bg-[#F3E8FF]" : ""}`}>
+              <User size={18} />
+            </div>
+            <span className="text-[9px] font-mono font-bold">Profile</span>
+          </button>
+        </nav>
 
         {/* ECOPOINTS REWARDS MODAL */}
         {showRewardsModal && (
