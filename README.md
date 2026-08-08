@@ -905,9 +905,9 @@ For persistence across restarts, mount volumes for `/app/backend/data` and the S
 
 **Team 24x7** — built for the Dell FutureMind AI Hackathon Grand Final 2026.
 
-- **Utkar Sinha**
-- **Mishkan Gupta**
-- **Somya Sagar Naik**
+- **Utkarsh Sinha**
+- **Muskan Gupta**
+- **Soumya Sagar Nayak**
 - **Abhijit Chaudhary**
 - **Subham Sadangi**
 
@@ -921,5 +921,5 @@ Further technical depth on the agents, RBAC personas, demo walkthrough, and repo
 
 <p align="center">
   <strong>Team 24x7</strong><br />
-  Utkarsh Sinha · Muskan Gupta · Soumya Sagar Naik · Abhijit Chaudhary · Subham Sadangi
+  Utkarsh Sinha · Muskan Gupta · Soumya Sagar Nayak · Abhijit Chaudhary · Subham Sadangi
 </p>
