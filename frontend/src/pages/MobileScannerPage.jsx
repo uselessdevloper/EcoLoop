@@ -492,37 +492,35 @@ export default function MobileScannerPage() {
                               GPay App Switch Intent
                             </span>
                             <h4 className="text-sm font-black tracking-tight">
-                              {selectedPreset === "laptop" ? "Verify Laptop Hardware Specs" : "Verify Mobile Android Specs"}
+                              Verify Device Hardware Telemetry
                             </h4>
                           </div>
                         </div>
-                        <span className="bg-emerald-400/20 text-emerald-300 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border border-emerald-400/40">
+                        <span className="bg-emerald-400/20 text-emerald-300 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border border-emerald-400/40 shrink-0">
                           ● REAL-TIME TELEMETRY
                         </span>
                       </div>
 
                       <p className="text-xs text-purple-100/90 leading-relaxed font-sans">
-                        {selectedPreset === "laptop"
-                          ? "Triggers PowerShell terminal spec dumper (`dump_specs.ps1`) to extract CPU cores, RAM, Battery cycles & S.M.A.R.T telemetry."
-                          : "Triggers GPay-style app intent launch to CPU-Z Lite Android App (`com.cpuz.lite`) to extract live hardware instrumentation."}
+                        Triggers GPay-style intent to CPU-Z Lite to extract live CPU cores, RAM, Battery health, and S.M.A.R.T telemetry across laptops and smartphones.
                       </p>
 
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => triggerCpuzFlow("laptop")}
-                          className="py-2.5 px-3 rounded-2xl bg-white hover:bg-purple-50 text-[#7C3AED] text-xs font-black font-mono shadow-md flex items-center justify-center gap-1.5 transition transform active:scale-95"
+                          className="p-2.5 rounded-2xl bg-white hover:bg-purple-50 text-[#7C3AED] text-[11px] font-black font-mono shadow-md flex items-center justify-center gap-1.5 text-center transition transform active:scale-95 leading-tight"
                         >
-                          <Laptop size={14} className="text-[#7C3AED]" />
-                          Run Laptop Test (MacBook M4)
+                          <Laptop size={15} className="text-[#7C3AED] shrink-0" />
+                          <span>Run Laptop Test (Windows / Mac)</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => triggerCpuzFlow("mobile")}
-                          className="py-2.5 px-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-xs font-black font-mono border border-white/30 flex items-center justify-center gap-1.5 transition transform active:scale-95"
+                          className="p-2.5 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-[11px] font-black font-mono border border-white/30 flex items-center justify-center gap-1.5 text-center transition transform active:scale-95 leading-tight"
                         >
-                          <Smartphone size={14} className="text-amber-300" />
-                          Run Mobile Android App
+                          <Smartphone size={15} className="text-amber-300 shrink-0" />
+                          <span>Run Mobile Android App</span>
                         </button>
                       </div>
 
