@@ -110,65 +110,82 @@ def call_gemini_vision_ai(
     diagnostics: Dict[str, Any] = {}
 ) -> Optional[Dict[str, Any]]:
     """
-    Calls Vision AI model for real-time asset identification.
-    Uses fallback chain: Direct Gemini API -> OpenRouter API -> NVIDIA NIM API.
-    """
-    import os
-    import requests
-    from dotenv import load_dotenv
-    load_dotenv()
-    
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    nvidia_key = os.getenv("NVIDIA_NIM_API_KEY")
+import os
+import requests
+import json
+from dotenv import load_dotenv
+load_dotenv()
 
-    all_ocr_texts = []
-    for idx, img_bytes in enumerate(images):
-        ocr_text = extract_ocr_text_from_image(img_bytes)
-        if ocr_text:
-            all_ocr_texts.append(f"Image {idx+1}: {ocr_text}")
-    combined_ocr = " | ".join(all_ocr_texts)
+gemini_key = os.getenv("GEMINI_API_KEY")
+openrouter_key = os.getenv("OPENROUTER_API_KEY")
+nvidia_key = os.getenv("NVIDIA_NIM_API_KEY")
 
-    prompt = (
-        f"You are the master hardware quality & e-waste inspection AI for EcoLoop India. Inspect these uploaded asset photos with extreme accuracy.\n\n"
-        f"EXTRACTED VISIBLE OCR TEXT FROM ALL PHOTOS: \"{combined_ocr}\"\n\n"
-        f"STEP 1: ACCURATE E-WASTE & ELECTRONICS IDENTIFICATION\n"
-        f"- IF THE IMAGE SHOWS A LIGHT BULB (fused filament bulb, LED bulb, CFL lamp, tube light), identify model_name as 'Fused Filament / LED Light Bulb' or exact brand (e.g. Havells / Wipro / Philips / Crompton), category as 'BULB' or 'E-WASTE BULB', health_score as 15, physical_condition as 'Fused / Burnt Filament', estimated_market_value in INR as 15 to 50 INR scrap floor value.\n"
-        f"- IF THE IMAGE SHOWS A LAPTOP (MacBook, Dell, Lenovo, HP, ASUS, Acer), identify exact model, category as 'LAPTOP'. Inspect for screen defects (flexgate stage-lighting backlight, cracked display, dead pixels).\n"
-        f"- IF THE IMAGE SHOWS A PHONE (iPhone, OnePlus, Samsung, Xiaomi, etc.), identify exact model, category as 'PHONE'.\n"
-        f"- IF THE IMAGE SHOWS CABLES, ADAPTERS, CHARGERS, ROUTERS, RAM, SSD, GPU, MOTHERBOARDS, identify accurately.\n\n"
-        f"STEP 2: INDIAN MARKET VALUE & ECOLOOP INCENTIVES\n"
-        f"- Output realistic Indian Rupees (INR) valuation, health score (0-100), and component breakdown.\n\n"
-        f"Declared category hint: {preset_category}. CPU-Z / Diagnostics: {json.dumps(diagnostics)}.\n\n"
-        f"Return a JSON object with this EXACT structure:\n"
-        f"{{\n"
-        f'  "model_name": "<Exact Identified Model, e.g. Apple Lightning Cable / Fused Filament Light Bulb / OnePlus 11 5G>",\n'
-        f'  "category": "<CHARGER / BULB / LAPTOP / PHONE / RAM / SSD / GPU / CABLE / ROUTER>",\n'
-        f'  "estimated_market_value": <integer market value in INR, e.g. 150 for cable, 35 for bulb, 28000 for phone>,\n'
-        f'  "health_score": <integer score 0 to 100>,\n'
-        f'  "star_rating": <integer rating 1 to 5>,\n'
-        f'  "physical_condition": "<Broken / Frayed Wires / Fused / Burnt Filament / Excellent / Cracked>",\n'
-        f'  "crack_probability_pct": <integer 0 to 100>,\n'
-        f'  "scratch_severity": "<None / Minor / Moderate / Severe>",\n'
-        f'  "burnt_trace_detected": <boolean true/false>,\n'
-        f'  "ecopoints_earned": <integer 50 for bulb, 500 for phone, 1000 for laptop>,\n'
-        f'  "exchange_bonus_inr": 1500,\n'
-        f'  "greenscore_kg": <float 0.15>,\n'
-        f'  "kabadiwala_partner": {{\n'
-        f'    "partner_uid": "KBD-9402",\n'
-        f'    "partner_name": "Verified EcoLoop Partner Ramesh",\n'
-        f'    "commission_inr": 250,\n'
-        f'    "payout_status": "INSTANT_UPI_READY"\n'
-        f'  }},\n'
-        f'  "components": [\n'
-        f'    {{"name": "<Component Name>", "status": "<Functional / Fused / Damaged>", "value_inr": <integer value in INR>, "health_pct": <integer 0 to 100>}}\n'
-        f'  ],\n'
-        f'  "marketplace_bids": [\n'
-        f'    {{"buyer_name": "<Buyer Name>", "offer_type": "<Refurbish & Resell / Component Harvesting / Material Floor>", "offer_amount": <integer offer in INR>, "badge": "<Highest Offer / Guaranteed Floor>", "delivery_time": "<24 Hours Pickup>"}}\n'
-        f'  ]\n'
-        f"}}\n"
-        f"IMPORTANT: Output ONLY raw valid JSON."
-    )
+# Try to initialize Google Gemini (genai) client if available.
+client = None
+try:
+    from google import genai
+    from google.genai import types
+    from google.oauth2.credentials import Credentials
+
+    if gemini_key and gemini_key.strip() and not gemini_key.startswith("your_"):
+        client = genai.Client(api_key=gemini_key.strip())
+    else:
+        token = get_gcloud_token()
+        if token:
+            creds = Credentials(token)
+            client = genai.Client(credentials=creds, vertexai=True, project="waskpilotai", location="us-central1")
+except Exception:
+    # google.genai not installed or initialization failed — fall back to other providers later
+    client = None
+
+all_ocr_texts = []
+for idx, img_bytes in enumerate(images):
+    ocr_text = extract_ocr_text_from_image(img_bytes)
+    if ocr_text:
+        all_ocr_texts.append(f"Image {idx+1}: {ocr_text}")
+combined_ocr = " | ".join(all_ocr_texts)
+
+prompt = (
+    f"You are the master hardware quality & e-waste inspection AI for EcoLoop India. Inspect these uploaded asset photos with extreme accuracy.\n\n"
+    f"EXTRACTED VISIBLE OCR TEXT FROM ALL PHOTOS: \"{combined_ocr}\"\n\n"
+    f"STEP 1: ACCURATE E-WASTE & ELECTRONICS IDENTIFICATION\n"
+    f"- IF THE IMAGE SHOWS A LIGHT BULB (fused filament bulb, LED bulb, CFL lamp, tube light), identify model_name as 'Fused Filament / LED Light Bulb' or exact brand (e.g. Havells / Wipro / Philips / Crompton), category as 'BULB' or 'E-WASTE BULB', health_score as 15, physical_condition as 'Fused / Burnt Filament', estimated_market_value in INR as 15 to 50 INR scrap floor value.\n"
+    f"- IF THE IMAGE SHOWS A LAPTOP (MacBook, Dell, Lenovo, HP, ASUS, Acer), identify exact model, category as 'LAPTOP'. Inspect for screen defects (flexgate stage-lighting backlight, cracked display, dead pixels).\n"
+    f"- IF THE IMAGE SHOWS A PHONE (iPhone, OnePlus, Samsung, Xiaomi, etc.), identify exact model, category as 'PHONE'.\n"
+    f"- IF THE IMAGE SHOWS CABLES, ADAPTERS, CHARGERS, ROUTERS, RAM, SSD, GPU, MOTHERBOARDS, identify accurately.\n\n"
+    f"STEP 2: INDIAN MARKET VALUE & ECOLOOP INCENTIVES\n"
+    f"- Output realistic Indian Rupees (INR) valuation, health score (0-100), and component breakdown.\n\n"
+    f"Declared category hint: {preset_category}. CPU-Z / Diagnostics: {json.dumps(diagnostics)}.\n\n"
+    f"Return a JSON object with this EXACT structure:\n"
+    f"{{\n"
+    f'  "model_name": "<Exact Identified Model, e.g. Apple Lightning Cable / Fused Filament Light Bulb / OnePlus 11 5G>",\n'
+    f'  "category": "<CHARGER / BULB / LAPTOP / PHONE / RAM / SSD / GPU / CABLE / ROUTER>",\n'
+    f'  "estimated_market_value": <integer market value in INR, e.g. 150 for cable, 35 for bulb, 28000 for phone>,\n'
+    f'  "health_score": <integer score 0 to 100>,\n'
+    f'  "star_rating": <integer rating 1 to 5>,\n'
+    f'  "physical_condition": "<Broken / Frayed Wires / Fused / Burnt Filament / Excellent / Cracked>",\n'
+    f'  "crack_probability_pct": <integer 0 to 100>,\n'
+    f'  "scratch_severity": "<None / Minor / Moderate / Severe>",\n'
+    f'  "burnt_trace_detected": <boolean true/false>,\n'
+    f'  "ecopoints_earned": <integer 50 for bulb, 500 for phone, 1000 for laptop>,\n'
+    f'  "exchange_bonus_inr": 1500,\n'
+    f'  "greenscore_kg": <float 0.15>,\n'
+    f'  "kabadiwala_partner": {{\n'
+    f'    "partner_uid": "KBD-9402",\n'
+    f'    "partner_name": "Verified EcoLoop Partner Ramesh",\n'
+    f'    "commission_inr": 250,\n'
+    f'    "payout_status": "INSTANT_UPI_READY"\n'
+    f'  }},\n'
+    f'  "components": [\n'
+    f'    {{"name": "<Component Name>", "status": "<Functional / Fused / Damaged>", "value_inr": <integer value in INR>, "health_pct": <integer 0 to 100>}}\n'
+    f'  ],\n'
+    f'  "marketplace_bids": [\n'
+    f'    {{"buyer_name": "<Buyer Name>", "offer_type": "<Refurbish & Resell / Component Harvesting / Material Floor>", "offer_amount": <integer offer in INR>, "badge": "<Highest Offer / Guaranteed Floor>", "delivery_time": "<24 Hours Pickup>"}}\n'
+    f'  ]\n'
+    f"}}\n"
+    f"IMPORTANT: Output ONLY raw valid JSON."
+)
+
 
     # 1. Try Direct Google Gemini API if key exists
     if gemini_key:

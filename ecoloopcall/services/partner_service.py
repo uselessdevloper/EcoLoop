@@ -8,7 +8,7 @@ SEED_PARTNERS = [
     {
         "uid": "PTR-RAJESH-01",
         "name": "Rajesh",
-        "phone": "+919142041131",
+        "phone": "+91-9142041131",
         "latitude": 28.6139,
         "longitude": 77.2090,
         "status": "available",
@@ -122,3 +122,6 @@ def delete_partner(db: Session, partner_id: int) -> bool:
     db.delete(db_partner)
     db.commit()
     return True
+
+
+

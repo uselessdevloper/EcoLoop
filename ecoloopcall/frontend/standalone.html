@@ -105,9 +105,11 @@
       );
     }
 
-    // Status Tracker Component with 3s Axios Polling & Pickup Confirmed Banner
+    // Status Tracker Component with 3s Axios Polling & Interactive Controls
     function StatusTracker({ pickupId, onReset }) {
       const [pickupData, setPickupData] = useState(null);
+      const [actionLoading, setActionLoading] = useState(null);
+      const [actionMessage, setActionMessage] = useState('');
 
       const fetchStatus = async () => {
         try {
@@ -123,6 +125,74 @@
         const interval = setInterval(fetchStatus, 3000); // Poll backend every 3s
         return () => clearInterval(interval);
       }, [pickupId]);
+
+      const handleSimulateAccept = async () => {
+        setActionLoading('accept');
+        setActionMessage('');
+        try {
+          const params = new URLSearchParams();
+          params.append('Digits', '1');
+          await axios.post(`${API_BASE_URL}/voice-response?pickup_id=${pickupId}`, params, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          });
+          setActionMessage('✓ Partner Call Accepted! Status updated to Accepted.');
+          await fetchStatus();
+        } catch (err) {
+          setActionMessage('Failed to simulate accept.');
+        } finally {
+          setActionLoading(null);
+        }
+      };
+
+      const handleSimulateReject = async () => {
+        setActionLoading('reject');
+        setActionMessage('');
+        try {
+          const params = new URLSearchParams();
+          params.append('Digits', '2');
+          await axios.post(`${API_BASE_URL}/voice-response?pickup_id=${pickupId}`, params, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          });
+          setActionMessage('⚠️ Partner Call Rejected. Automatic SMS Fallback triggered!');
+          await fetchStatus();
+        } catch (err) {
+          setActionMessage('Failed to simulate reject.');
+        } finally {
+          setActionLoading(null);
+        }
+      };
+
+      const handleSimulateSmsAccept = async () => {
+        setActionLoading('sms');
+        setActionMessage('');
+        try {
+          const params = new URLSearchParams();
+          params.append('Body', 'ACCEPT');
+          await axios.post(`${API_BASE_URL}/sms-reply?pickup_id=${pickupId}`, params, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          });
+          setActionMessage('✓ SMS Reply "ACCEPT" processed! Status updated to Accepted.');
+          await fetchStatus();
+        } catch (err) {
+          setActionMessage('Failed to simulate SMS accept.');
+        } finally {
+          setActionLoading(null);
+        }
+      };
+
+      const handleMessageAgain = async () => {
+        setActionLoading('redispatch');
+        setActionMessage('');
+        try {
+          const res = await axios.post(`${API_BASE_URL}/pickup/${pickupId}/dispatch`);
+          setActionMessage(`📲 Re-dispatched pickup! Voice call & SMS re-sent.`);
+          await fetchStatus();
+        } catch (err) {
+          setActionMessage('Failed to re-dispatch.');
+        } finally {
+          setActionLoading(null);
+        }
+      };
 
       const status = pickupData?.status || 'Pending';
       const isStep1 = status === 'Pending' || status === 'Searching';
@@ -168,6 +238,36 @@
             <div className={`p-4 rounded-xl border ${isStep3 ? 'bg-emerald-500 text-slate-950 font-bold' : isRejected ? 'bg-red-950 border-red-500 text-red-300' : 'bg-slate-900 border-slate-800 opacity-60'}`}>
               <div className="font-bold">{isRejected ? '3. Call Rejected / SMS Sent' : '3. Accepted'}</div>
               <p className="text-xs opacity-80 mt-1">{isRejected ? 'Partner rejected call. Fallback SMS sent.' : 'Partner confirmed pickup assignment'}</p>
+            </div>
+          </div>
+
+          {actionMessage && (
+            <div className="p-3 rounded-xl bg-emerald-950 border border-emerald-500 text-emerald-300 text-xs text-center font-medium">
+              {actionMessage}
+            </div>
+          )}
+
+          {/* Interactive Simulation Controls */}
+          <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              Twilio Dispatch Actions & Testing Controls
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+              <button onClick={handleSimulateAccept} disabled={actionLoading !== null || isStep3} className="py-2.5 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-xl transition">
+                {actionLoading === 'accept' ? 'Accepting...' : '✓ Accept Call (Press 1)'}
+              </button>
+
+              <button onClick={handleSimulateReject} disabled={actionLoading !== null || isStep3} className="py-2.5 px-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/40 text-red-400 rounded-xl transition">
+                {actionLoading === 'reject' ? 'Rejecting...' : '✕ Reject Call (Press 2)'}
+              </button>
+
+              <button onClick={handleSimulateSmsAccept} disabled={actionLoading !== null || isStep3} className="py-2.5 px-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 rounded-xl transition">
+                {actionLoading === 'sms' ? 'Replying...' : '💬 Accept via SMS ("ACCEPT")'}
+              </button>
+
+              <button onClick={handleMessageAgain} disabled={actionLoading !== null} className="py-2.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-xl transition">
+                {actionLoading === 'redispatch' ? 'Sending...' : '🔄 Message & Call Again'}
+              </button>
             </div>
           </div>
 
